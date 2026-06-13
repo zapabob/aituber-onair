@@ -74,7 +74,7 @@ npm run dev
 
 ### 3. サンプルアプリをローカルで動かす
 
-`@aituber-onair/core` をベースにしたフル機能の React サンプルを3種類用意しています。プロジェクトに合うアバター方式を選んでください。LLM / TTS プロバイダー対応範囲と **Settings** UI はどれも共通です。
+`@aituber-onair/core` をベースにしたフル機能の React サンプルを4種類用意しています。プロジェクトに合うアバター方式を選んでください。LLM / TTS プロバイダー対応範囲と **Settings** UI はどれも共通です。
 
 #### PNGTuber Chat — 2D PNG アバター
 
@@ -98,6 +98,21 @@ npm run dev
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
 cd aituber-onair/packages/core/examples/react-vrm-app
+npm install
+npm run dev
+```
+
+#### FBX Chat — 3D FBX アバター
+
+任意の FBX キャラクター（`avatar.fbx`）を表示し、任意の `idle.fbx` と
+`talk.fbx` を合成できます。音声出力に合わせた口元・顎の動き、軽い待機
+モーション、感情タグに合わせた表情モーフ、カメラ操作、YouTube / Twitch の
+ライブコメント連携に対応します。
+詳細は [`packages/core/examples/react-fbx-app`](./packages/core/examples/react-fbx-app) を参照。
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-fbx-app
 npm install
 npm run dev
 ```

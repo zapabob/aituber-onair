@@ -18,6 +18,9 @@ AITuber OnAir には、フル機能のアプリサンプルと、より小さな
 - 3D アバターを使いたい場合は
   [`packages/core/examples/react-vrm-app`](../packages/core/examples/react-vrm-app)
   を使います。
+- FBX キャラクターとモーションクリップを持っている場合は
+  [`packages/core/examples/react-fbx-app`](../packages/core/examples/react-fbx-app)
+  を使います。
 - すでに Live2D モデルアセットを持っている場合は
   [`packages/core/examples/react-live2d-app`](../packages/core/examples/react-live2d-app)
   を使います。
@@ -58,6 +61,22 @@ npm run dev
 
 ```bash
 cd packages/core/examples/react-vrm-app
+npm install
+npm run dev
+```
+
+### FBX App
+
+パス:
+[`packages/core/examples/react-fbx-app`](../packages/core/examples/react-fbx-app)
+
+FBX キャラクターリグをすでに持っている場合に向いています。
+`avatar.fbx` を読み込み、任意の `idle.fbx` と `talk.fbx` を合成し、
+音声出力ボリュームから口元または顎の動きを駆動します。発話中は
+screenplay 感情タグに合う表情モーフも合成します。
+
+```bash
+cd packages/core/examples/react-fbx-app
 npm install
 npm run dev
 ```

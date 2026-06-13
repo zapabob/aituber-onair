@@ -19,6 +19,10 @@ to the package examples when you need lower-level integration.
   [`packages/core/examples/react-vrm-app`](../packages/core/examples/react-vrm-app)
   if you want a 3D avatar with VRM assets.
 - Use
+  [`packages/core/examples/react-fbx-app`](../packages/core/examples/react-fbx-app)
+  if you already have an FBX character and animation clips for a 3D streaming
+  avatar.
+- Use
   [`packages/core/examples/react-live2d-app`](../packages/core/examples/react-live2d-app)
   if you already have Live2D model assets.
 - Use package examples when you want to embed chat, voice, memory, or streaming
@@ -58,6 +62,22 @@ VRMA animation, and includes camera controls.
 
 ```bash
 cd packages/core/examples/react-vrm-app
+npm install
+npm run dev
+```
+
+### FBX App
+
+Path:
+[`packages/core/examples/react-fbx-app`](../packages/core/examples/react-fbx-app)
+
+Best when you already have an FBX character rig. It loads `avatar.fbx`,
+optionally blends `idle.fbx` and `talk.fbx`, and drives mouth or jaw motion
+from audio output volume. It also blends matching expression morph targets from
+screenplay emotion tags during speech.
+
+```bash
+cd packages/core/examples/react-fbx-app
 npm install
 npm run dev
 ```

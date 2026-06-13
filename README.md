@@ -75,8 +75,8 @@ For step-by-step setup and template selection, see
 
 ### 3. Run an example app locally
 
-Three full, ready-to-run React apps built on `@aituber-onair/core`. Pick the
-avatar style that fits your project. All three share the same broad LLM / TTS
+Four full, ready-to-run React apps built on `@aituber-onair/core`. Pick the
+avatar style that fits your project. All four share the same broad LLM / TTS
 provider coverage and in-app **Settings** UI.
 
 #### PNGTuber Chat — 2D PNG avatar
@@ -101,6 +101,21 @@ Render a 3D VRM avatar (`miko.vrm`) with optional idle VRMA animation, real-time
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
 cd aituber-onair/packages/core/examples/react-vrm-app
+npm install
+npm run dev
+```
+
+#### FBX Chat — 3D FBX avatar
+
+Render your own FBX character (`avatar.fbx`) with optional `idle.fbx` and
+`talk.fbx` animation clips, audio-driven mouth/jaw motion, procedural idle
+motion, emotion-tag expression morphs, camera controls, and the same YouTube /
+Twitch live-comment pipeline.
+See [`packages/core/examples/react-fbx-app`](./packages/core/examples/react-fbx-app).
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-fbx-app
 npm install
 npm run dev
 ```
