@@ -80,7 +80,11 @@ jobs:
 
       - name: Lint FBX example
         working-directory: packages/core/examples/react-fbx-app
-        run: npm run lint
+        run: npm run lint:ci
+
+      - name: Typecheck FBX example
+        working-directory: packages/core/examples/react-fbx-app
+        run: npm run typecheck
 
       - name: Build FBX example
         working-directory: packages/core/examples/react-fbx-app
