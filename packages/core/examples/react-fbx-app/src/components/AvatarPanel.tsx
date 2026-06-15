@@ -44,9 +44,11 @@ interface ExpressionBinding {
   baseInfluence: number;
 }
 
-const FBX_MODEL_URL = `${import.meta.env.BASE_URL}avatar/avatar.fbx`;
-const IDLE_ANIMATION_URL = `${import.meta.env.BASE_URL}avatar/idle.fbx`;
-const TALK_ANIMATION_URL = `${import.meta.env.BASE_URL}avatar/talk.fbx`;
+const AVATAR_BASE_URL = `${import.meta.env.BASE_URL}avatar/`;
+const DEFAULT_FBX_MODEL_URL = `${AVATAR_BASE_URL}avatar.fbx`;
+const AVATAR_MANIFEST_URL = `${AVATAR_BASE_URL}manifest.json`;
+const IDLE_ANIMATION_URL = `${AVATAR_BASE_URL}idle.fbx`;
+const TALK_ANIMATION_URL = `${AVATAR_BASE_URL}talk.fbx`;
 const MAX_MOUTH_LEVEL = 4;
 const TARGET_MODEL_HEIGHT = 1.72;
 const DEFAULT_VISIBLE_HEIGHT_RATIO = 0.7;
@@ -69,6 +71,38 @@ const EXPRESSION_MORPH_PATTERNS: Record<ExpressionBinding['emotion'], RegExp> =
     surprised: /(surprise|surprised|shock|wow)/i,
     relaxed: /(relax|relaxed|calm|soft|peace)/i,
   };
+
+interface AvatarManifest {
+  files?: string[];
+}
+
+function sanitizeManifestFiles(manifest: unknown): string[] {
+  if (!Array.isArray(manifest)) return [];
+  return manifest.filter((file): file is string => typeof file === 'string');
+}
+
+function getModelResourceBase(modelUrl: string): string {
+  const url = new URL(modelUrl, window.location.href);
+  url.pathname = url.pathname.replace(/[^/]*$/, '');
+  return url.toString();
+}
+
+async function responseLooksLikeFbx(response: Response): Promise<boolean> {
+  if (!response.ok) return false;
+
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('text/html')) return false;
+
+  const buffer = await response.arrayBuffer();
+  const header = String.fromCharCode(
+    ...new Uint8Array(buffer.slice(0, Math.min(buffer.byteLength, 64))),
+  );
+  return (
+    header.startsWith('Kaydara FBX Binary') ||
+    header.includes('FBXHeaderExtension') ||
+    header.includes('; FBX')
+  );
+}
 
 function isMesh(object: Object3D): object is Mesh {
   return (object as Mesh).isMesh === true;
@@ -212,7 +246,58 @@ async function loadOptionalFbx(
     return null;
   }
 
-  return loader.parse(buffer, '') as Group;
+  const basePath = getModelResourceBase(url);
+  return loader.parse(buffer, basePath) as Group;
+}
+
+async function resolveAvatarModelUrl(): Promise<string | null> {
+  const defaultResponse = await fetch(DEFAULT_FBX_MODEL_URL, {
+    method: 'GET',
+    headers: { Range: 'bytes=0-127' },
+  });
+  if (await responseLooksLikeFbx(defaultResponse)) {
+    return DEFAULT_FBX_MODEL_URL;
+  }
+
+  const manifestResponse = await fetch(AVATAR_MANIFEST_URL);
+  if (!manifestResponse.ok) {
+    return null;
+  }
+
+  const manifest = (await manifestResponse.json()) as AvatarManifest;
+  const files = sanitizeManifestFiles(manifest.files);
+  const avatarFile =
+    files.find((file) => file.toLowerCase() === 'avatar.fbx') ??
+    files.find((file) => file.toLowerCase().endsWith('.fbx') && !['idle.fbx', 'talk.fbx'].includes(file.toLowerCase()));
+
+  return avatarFile ? `${AVATAR_BASE_URL}${encodeURIComponent(avatarFile)}` : null;
+}
+
+async function resolveAnimationUrl(kind: 'idle' | 'talk'): Promise<string | null> {
+  const manifestResponse = await fetch(AVATAR_MANIFEST_URL);
+  if (!manifestResponse.ok) {
+    return kind === 'idle' ? IDLE_ANIMATION_URL : TALK_ANIMATION_URL;
+  }
+
+  const manifest = (await manifestResponse.json()) as AvatarManifest;
+  const files = sanitizeManifestFiles(manifest.files).map((file) => file.trim());
+  const normalized = files.filter((file) => file.toLowerCase().endsWith('.fbx'));
+
+  const exactName = `${kind}.fbx`;
+  const exact = normalized.find((file) => file.toLowerCase() === exactName);
+  if (exact) return `${AVATAR_BASE_URL}${encodeURIComponent(exact)}`;
+
+  const pattern =
+    kind === 'idle'
+      ? /(idle|wait|neutral|relax|default)/i
+      : /(talk|speech|voice|lip|mouth)/i;
+
+  const found = normalized.find((file) => pattern.test(file));
+  return found
+    ? `${AVATAR_BASE_URL}${encodeURIComponent(found)}`
+    : kind === 'idle'
+      ? IDLE_ANIMATION_URL
+      : TALK_ANIMATION_URL;
 }
 
 function fitModelToStage(
@@ -401,12 +486,13 @@ export function AvatarBackground({
     let baseModelRotationY = 0;
 
     const loader = new FBXLoader();
-    void loadOptionalFbx(loader, FBX_MODEL_URL)
-      .then((model) => {
+    void resolveAvatarModelUrl()
+      .then(async (modelUrl) => {
         if (disposed) return;
+        const model = modelUrl ? await loadOptionalFbx(loader, modelUrl) : null;
         if (!model) {
           setLoadError(
-            'FBX model could not be loaded. Put avatar.fbx in public/avatar/.',
+            'FBX model could not be loaded. Put an .fbx file in public/avatar/.',
           );
           setIsLoading(false);
           return;
@@ -433,7 +519,10 @@ export function AvatarBackground({
 
         setIsLoading(false);
 
-        void loadOptionalFbx(loader, IDLE_ANIMATION_URL)
+        void resolveAnimationUrl('idle')
+          .then((resolvedIdleUrl) =>
+            resolvedIdleUrl ? loadOptionalFbx(loader, resolvedIdleUrl) : null,
+          )
           .then((idleModel) => {
             if (disposed || !idleModel || !mixer) return;
             const idleClip = idleModel.animations[0];
@@ -445,7 +534,10 @@ export function AvatarBackground({
             console.warn('Failed to load optional FBX idle animation:', error);
           });
 
-        void loadOptionalFbx(loader, TALK_ANIMATION_URL)
+        void resolveAnimationUrl('talk')
+          .then((resolvedTalkUrl) =>
+            resolvedTalkUrl ? loadOptionalFbx(loader, resolvedTalkUrl) : null,
+          )
           .then((talkModel) => {
             if (disposed || !talkModel || !mixer) return;
             const talkClip = talkModel.animations[0];
@@ -460,7 +552,7 @@ export function AvatarBackground({
         if (disposed) return;
         console.error('Failed to load FBX:', error);
         setLoadError(
-          'FBX model could not be loaded. Put avatar.fbx in public/avatar/.',
+          'FBX model could not be loaded. Put an .fbx file in public/avatar/.',
         );
         setIsLoading(false);
       });

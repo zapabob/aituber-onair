@@ -8,6 +8,7 @@
  * - Authenticate Codex in your local environment.
  */
 const readline = require('node:readline/promises');
+const fs = require('node:fs');
 
 const DEFAULT_CHARACTER_NAME = 'ミコ';
 const MAX_HISTORY_MESSAGES = 12;
@@ -50,6 +51,7 @@ function usage() {
   console.log('  --workingDirectory="/path/to/project"');
   console.log('  --skipGitRepoCheck=false');
   console.log('  --responseLength="short"');
+  console.log('  --onceFile="/path/to/utf8-prompt.txt"');
   console.log('  --help');
   console.log('');
   console.log('Environment variables:');
@@ -93,7 +95,9 @@ function buildConfig() {
     args.systemPrompt ||
     process.env.CODEX_CHARACTER_SYSTEM_PROMPT ||
     defaultSystemPrompt(characterName);
-  const oneShotPrompt = args.once || args.positional.join(' ').trim();
+  const oneShotPrompt = args.onceFile
+    ? fs.readFileSync(String(args.onceFile), 'utf8').trim()
+    : args.once || args.positional.join(' ').trim();
 
   return {
     characterName,
