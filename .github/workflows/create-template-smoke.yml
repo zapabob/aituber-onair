@@ -47,6 +47,15 @@ jobs:
           npm pack --pack-destination "$RUNNER_TEMP/core-package"
           echo "tarball=$(find "$RUNNER_TEMP/core-package" -name '*.tgz' -print -quit)" >> "$GITHUB_OUTPUT"
 
+      - name: Pack Chat
+        id: pack-chat
+        working-directory: packages/chat
+        run: |
+          npm run build
+          mkdir -p "$RUNNER_TEMP/chat-package"
+          npm pack --pack-destination "$RUNNER_TEMP/chat-package"
+          echo "tarball=$(find "$RUNNER_TEMP/chat-package" -name '*.tgz' -print -quit)" >> "$GITHUB_OUTPUT"
+
       - name: Pack create-aituber-onair
         id: pack
         working-directory: packages/create-aituber-onair
@@ -61,3 +70,4 @@ jobs:
           "${{ matrix.template }}"
           "${{ steps.pack.outputs.tarball }}"
           "${{ steps.pack-core.outputs.tarball }}"
+          "${{ steps.pack-chat.outputs.tarball }}"

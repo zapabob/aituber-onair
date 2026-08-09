@@ -1,5 +1,15 @@
 # @aituber-onair/core
 
+## 0.26.11
+
+### Patch Changes
+
+- Fixed packaged Core installations by requiring
+  `@aituber-onair/chat@^0.51.0`, which includes the public tool-call
+  continuation helpers used by Core.
+
+  - @aituber-onair/chat@0.51.0
+
 ## 0.26.10
 
 ### Patch Changes
