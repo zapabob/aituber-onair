@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AITuberOnAirCore,
   AITuberOnAirCoreEvent,
+  getDefaultXaiReasoningEffort,
   isGPT5Model,
+  isXaiReasoningEffortModel,
 } from '@aituber-onair/core';
 import { ManneriDetector } from '@aituber-onair/manneri';
 import type {
@@ -19,9 +21,17 @@ import type {
 import type { Message as ManneriMessage } from '@aituber-onair/manneri';
 import type { ChatMessage } from '../types/chat';
 import type { AppSettings, ChatProviderOption } from '../types/settings';
+import { DEFAULT_SYSTEM_PROMPT } from '../constants/prompts';
+
+interface ScreenplayLike {
+  emotion?: string;
+  text?: string;
+}
 
 interface UseAituberCoreOptions {
   onAudioPlay: (arrayBuffer: ArrayBuffer) => Promise<void>;
+  onSpeechStart?: (screenplay: ScreenplayLike) => void;
+  onSpeechEnd?: () => void;
   settings: AppSettings;
   getApiKeyForProvider: (provider: ChatProviderOption) => string;
 }
@@ -30,8 +40,8 @@ type ProcessChatOptions = {
   displayText?: string;
 };
 
-const AITUBER_SYSTEM_PROMPT =
-  'あなたはフレンドリーなAITuberです。回答はできるだけ一言で、短く自然に返してください。';
+const DEFAULT_VISION_PROMPT =
+  'OBS仮想カメラの画面を見て、配信者として短く自然にコメントしてください。';
 const GPT5_SAMPLE_PROVIDER_OPTIONS = { gpt5Preset: 'casual' as const };
 const GPT5_SAMPLE_CHAT_OPTIONS = { responseLength: 'veryShort' as const };
 
@@ -157,6 +167,9 @@ function buildVoiceOptions(
   const parsedPiperPlusNoiseScale = Number.parseFloat(
     tts.piperPlusNoiseScale || '',
   );
+  const parsedWebSpeechRate = Number.parseFloat(tts.webSpeechRate || '');
+  const parsedWebSpeechPitch = Number.parseFloat(tts.webSpeechPitch || '');
+  const parsedWebSpeechVolume = Number.parseFloat(tts.webSpeechVolume || '');
   const trimmedSpeaker = tts.speaker.trim();
 
   return {
@@ -259,8 +272,7 @@ function buildVoiceOptions(
       : parsedInworldTemperature,
     gradiumApiUrl: tts.gradiumApiUrl?.trim() || undefined,
     gradiumOutputFormat:
-      (tts.gradiumOutputFormat as GradiumOutputFormat | undefined) ||
-      undefined,
+      (tts.gradiumOutputFormat as GradiumOutputFormat | undefined) || undefined,
     gradiumTemperature: Number.isNaN(parsedGradiumTemperature)
       ? undefined
       : parsedGradiumTemperature,
@@ -281,16 +293,43 @@ function buildVoiceOptions(
     piperPlusNoiseScale: Number.isNaN(parsedPiperPlusNoiseScale)
       ? undefined
       : parsedPiperPlusNoiseScale,
+    webSpeechRate: Number.isNaN(parsedWebSpeechRate)
+      ? undefined
+      : parsedWebSpeechRate,
+    webSpeechPitch: Number.isNaN(parsedWebSpeechPitch)
+      ? undefined
+      : parsedWebSpeechPitch,
+    webSpeechVolume: Number.isNaN(parsedWebSpeechVolume)
+      ? undefined
+      : parsedWebSpeechVolume,
+    webSpeechLanguage: tts.webSpeechLanguage?.trim() || undefined,
     onPlay,
   } as VoiceServiceOptions;
 }
 
+function extractScreenplay(data: unknown): ScreenplayLike | null {
+  if (!data || typeof data !== 'object') return null;
+  const source = (data as { screenplay?: unknown }).screenplay ?? data;
+  if (!source || typeof source !== 'object') return null;
+  const screenplay = source as { emotion?: unknown; text?: unknown };
+  const emotion =
+    typeof screenplay.emotion === 'string' ? screenplay.emotion : undefined;
+  const text =
+    typeof screenplay.text === 'string' ? screenplay.text : undefined;
+  return emotion || text ? { emotion, text } : null;
+}
+
 export function useAituberCore({
   onAudioPlay,
+  onSpeechStart,
+  onSpeechEnd,
   settings,
   getApiKeyForProvider,
 }: UseAituberCoreOptions) {
   const coreRef = useRef<AITuberOnAirCore | null>(null);
+  const chatHistoryRef = useRef<ReturnType<AITuberOnAirCore['getChatHistory']>>(
+    [],
+  );
   const manneriDetectorRef = useRef<ManneriDetector | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
   const messageIdSequenceRef = useRef(0);
@@ -300,7 +339,13 @@ export function useAituberCore({
 
   // Keep the latest onAudioPlay callback in a ref
   const onAudioPlayRef = useRef(onAudioPlay);
-  onAudioPlayRef.current = onAudioPlay;
+  const onSpeechStartRef = useRef(onSpeechStart);
+  const onSpeechEndRef = useRef(onSpeechEnd);
+  useEffect(() => {
+    onAudioPlayRef.current = onAudioPlay;
+    onSpeechStartRef.current = onSpeechStart;
+    onSpeechEndRef.current = onSpeechEnd;
+  }, [onAudioPlay, onSpeechEnd, onSpeechStart]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -340,11 +385,20 @@ export function useAituberCore({
       : settings.llm.model;
   const isOpenAIGPT5Model =
     settings.llm.provider === 'openai' && isGPT5Model(resolvedModel);
+  const xaiProviderOptions =
+    settings.llm.provider === 'xai' && isXaiReasoningEffortModel(resolvedModel)
+      ? {
+          reasoning_effort:
+            settings.llm.xaiReasoningEffort ||
+            getDefaultXaiReasoningEffort(resolvedModel) ||
+            'none',
+        }
+      : undefined;
   const providerOptions = isOpenAICompatibleProvider
     ? { endpoint: openAICompatibleEndpoint }
     : isOpenAIGPT5Model
       ? GPT5_SAMPLE_PROVIDER_OPTIONS
-      : undefined;
+      : xaiProviderOptions;
   const createMessageId = useCallback(() => {
     messageIdSequenceRef.current += 1;
     return `${Date.now()}-${messageIdSequenceRef.current}`;
@@ -374,7 +428,7 @@ export function useAituberCore({
       model: resolvedModel,
       providerOptions,
       chatOptions: {
-        systemPrompt: AITUBER_SYSTEM_PROMPT,
+        systemPrompt: settings.llm.systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT,
         ...(isOpenAIGPT5Model ? GPT5_SAMPLE_CHAT_OPTIONS : {}),
       },
       voiceOptions: buildVoiceOptions(
@@ -386,6 +440,10 @@ export function useAituberCore({
       ),
       debug: false,
     } as ConstructorParameters<typeof AITuberOnAirCore>[0]);
+
+    if (chatHistoryRef.current.length > 0) {
+      core.setChatHistory(chatHistoryRef.current);
+    }
 
     // Subscribe to core events
     core.on(AITuberOnAirCoreEvent.PROCESSING_START, () => {
@@ -416,12 +474,15 @@ export function useAituberCore({
         const d = data as {
           message?: { content?: string } | string;
           rawText?: string;
+          screenplay?: { text?: string };
         };
         const msg = d?.message;
+        const cleanText = d?.screenplay?.text?.trim();
         content =
-          (typeof msg === 'string' ? msg : msg?.content) ??
-          d?.rawText ??
-          String(data);
+          cleanText ||
+          ((typeof msg === 'string' ? msg : msg?.content) ??
+            d?.rawText ??
+            String(data));
       }
       setMessages((prev) => [
         ...prev,
@@ -435,22 +496,37 @@ export function useAituberCore({
       setPartialResponse('');
     });
 
+    core.on(AITuberOnAirCoreEvent.SPEECH_START, (data: unknown) => {
+      const screenplay = extractScreenplay(data);
+      if (screenplay) onSpeechStartRef.current?.(screenplay);
+    });
+
+    core.on(AITuberOnAirCoreEvent.SPEECH_END, () => {
+      onSpeechEndRef.current?.();
+    });
+
     core.on(AITuberOnAirCoreEvent.ERROR, (error: unknown) => {
       console.error('AITuberOnAirCore error:', error);
       setIsProcessing(false);
+      onSpeechEndRef.current?.();
     });
 
     coreRef.current = core;
 
     return () => {
+      chatHistoryRef.current = core.getChatHistory();
       core.offAll();
-      coreRef.current = null;
+      if (coreRef.current === core) {
+        coreRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     settings.llm.provider,
     settings.llm.model,
+    settings.llm.systemPrompt,
     settings.llm.endpoint,
+    settings.llm.xaiReasoningEffort,
     llmApiKey,
     isApiKeyOptionalProvider,
     createMessageId,
@@ -486,6 +562,10 @@ export function useAituberCore({
     settings.tts.xaiCodec,
     settings.tts.xaiSampleRate,
     settings.tts.xaiBitRate,
+    settings.tts.webSpeechRate,
+    settings.tts.webSpeechPitch,
+    settings.tts.webSpeechVolume,
+    settings.tts.webSpeechLanguage,
     ttsApiKey,
   ]);
 
@@ -534,10 +614,36 @@ export function useAituberCore({
     [createMessageId],
   );
 
+  const processVisionChat = useCallback(
+    async (imageDataUrl: string, prompt = DEFAULT_VISION_PROMPT) => {
+      if (!coreRef.current || !imageDataUrl) return;
+
+      const trimmedPrompt = prompt.trim() || DEFAULT_VISION_PROMPT;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createMessageId(),
+          role: 'user',
+          content: '画面を見てコメント',
+          timestamp: Date.now(),
+        },
+      ]);
+
+      try {
+        await coreRef.current.processVisionChat(imageDataUrl, trimmedPrompt);
+      } catch (err) {
+        console.error('processVisionChat error:', err);
+        setIsProcessing(false);
+      }
+    },
+    [createMessageId],
+  );
+
   return {
     messages,
     isProcessing,
     partialResponse,
     processChat,
+    processVisionChat,
   };
 }

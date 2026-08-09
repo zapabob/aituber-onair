@@ -13,6 +13,8 @@ import {
   MODEL_CLAUDE_4_6_OPUS,
   MODEL_CLAUDE_4_7_OPUS,
   MODEL_CLAUDE_4_8_OPUS,
+  MODEL_CLAUDE_5_SONNET,
+  MODEL_CLAUDE_5_OPUS,
 } from '../../src/constants';
 
 // Mock ClaudeChatService
@@ -46,6 +48,8 @@ describe('ClaudeChatServiceProvider', () => {
         MODEL_CLAUDE_4_6_OPUS,
         MODEL_CLAUDE_4_7_OPUS,
         MODEL_CLAUDE_4_8_OPUS,
+        MODEL_CLAUDE_5_SONNET,
+        MODEL_CLAUDE_5_OPUS,
         MODEL_CLAUDE_3_HAIKU,
       ]);
     });
@@ -82,6 +86,8 @@ describe('ClaudeChatServiceProvider', () => {
       expect(provider.supportsVisionForModel(MODEL_CLAUDE_4_6_OPUS)).toBe(true);
       expect(provider.supportsVisionForModel(MODEL_CLAUDE_4_7_OPUS)).toBe(true);
       expect(provider.supportsVisionForModel(MODEL_CLAUDE_4_8_OPUS)).toBe(true);
+      expect(provider.supportsVisionForModel(MODEL_CLAUDE_5_SONNET)).toBe(true);
+      expect(provider.supportsVisionForModel(MODEL_CLAUDE_5_OPUS)).toBe(true);
     });
 
     it('should return false for non-vision models', () => {
@@ -108,6 +114,7 @@ describe('ClaudeChatServiceProvider', () => {
         [],
         [],
         undefined,
+        undefined,
       );
     });
 
@@ -125,6 +132,7 @@ describe('ClaudeChatServiceProvider', () => {
         MODEL_CLAUDE_4_6_SONNET,
         [],
         [],
+        undefined,
         undefined,
       );
     });
@@ -145,6 +153,7 @@ describe('ClaudeChatServiceProvider', () => {
         [],
         [],
         undefined,
+        undefined,
       );
     });
 
@@ -162,6 +171,7 @@ describe('ClaudeChatServiceProvider', () => {
         MODEL_CLAUDE_4_5_HAIKU,
         [],
         [],
+        undefined,
         undefined,
       );
     });
@@ -195,6 +205,7 @@ describe('ClaudeChatServiceProvider', () => {
         tools,
         [],
         undefined,
+        undefined,
       );
     });
 
@@ -220,6 +231,7 @@ describe('ClaudeChatServiceProvider', () => {
         MODEL_CLAUDE_4_5_HAIKU,
         [],
         mcpServers,
+        undefined,
         undefined,
       );
     });
@@ -264,6 +276,7 @@ describe('ClaudeChatServiceProvider', () => {
         tools,
         mcpServers,
         undefined,
+        undefined,
       );
     });
 
@@ -281,6 +294,7 @@ describe('ClaudeChatServiceProvider', () => {
         MODEL_CLAUDE_4_5_HAIKU,
         [],
         [],
+        undefined,
         undefined,
       );
     });
@@ -300,6 +314,7 @@ describe('ClaudeChatServiceProvider', () => {
         [],
         [],
         undefined,
+        undefined,
       );
     });
 
@@ -318,7 +333,48 @@ describe('ClaudeChatServiceProvider', () => {
         [],
         [],
         'short',
+        undefined,
       );
+    });
+
+    it('should pass a supported reasoning_effort', () => {
+      const options: ClaudeChatServiceOptions = {
+        apiKey: 'test-api-key',
+        model: MODEL_CLAUDE_5_OPUS,
+        reasoning_effort: 'low',
+      };
+
+      provider.createChatService(options);
+
+      expect(ClaudeChatService).toHaveBeenCalledWith(
+        'test-api-key',
+        MODEL_CLAUDE_5_OPUS,
+        MODEL_CLAUDE_5_OPUS,
+        [],
+        [],
+        undefined,
+        'low',
+      );
+    });
+
+    it('should reject reasoning_effort for an unsupported model', () => {
+      expect(() =>
+        provider.createChatService({
+          apiKey: 'test-api-key',
+          model: MODEL_CLAUDE_4_5_HAIKU,
+          reasoning_effort: 'low',
+        }),
+      ).toThrow('does not support Claude reasoning_effort');
+    });
+
+    it('should reject an effort level unsupported by the selected model', () => {
+      expect(() =>
+        provider.createChatService({
+          apiKey: 'test-api-key',
+          model: MODEL_CLAUDE_4_6_OPUS,
+          reasoning_effort: 'xhigh',
+        }),
+      ).toThrow('Supported values: low, medium, high, max');
     });
   });
 });

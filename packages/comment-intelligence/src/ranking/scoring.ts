@@ -1,13 +1,13 @@
-import type { LiveComment } from '../types/comment';
-import type { StreamState } from '../types/context';
+import type { LiveComment } from '../types/comment.js';
+import type { StreamState } from '../types/context.js';
 import type {
   CommentScoreBreakdown,
   RankingReason,
   RankingWeights,
-} from '../types/ranking';
-import type { SafetyReport } from '../types/safety';
-import type { ViewerProfile } from '../types/viewer';
-import { normalizeText } from '../utils/text';
+} from '../types/ranking.js';
+import type { SafetyReport } from '../types/safety.js';
+import type { ViewerProfile } from '../types/viewer.js';
+import { normalizeText } from '../utils/text.js';
 
 const questionPatterns: Array<string | RegExp> = [
   '？',
@@ -88,6 +88,8 @@ export function scoreComment(input: {
   const topicRelevance = isTopicRelated(comment.text, streamState) ? 1 : 0;
   if (topicRelevance > 0) {
     reasons.push('topic_related');
+  } else if (streamState?.topic?.trim()) {
+    reasons.push('topic_unrelated');
   }
 
   const messageCount = viewerProfile?.messageCount ?? 0;

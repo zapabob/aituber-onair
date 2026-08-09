@@ -1,0 +1,116 @@
+# Pet Chat
+
+Web Speech API TTS is available with browser voice selection and rate, pitch,
+volume, and language controls. Because the browser plays it directly without
+exposing audio bytes, lip sync is not supported when this engine is selected.
+
+![react-pet-app image](./images/react-pet-app.jpg)
+
+An AITuber chat sample that renders a Codex-style animated pet instead of a
+static PNGTuber avatar.
+
+The app keeps the same basic structure as the other React core samples:
+
+- LLM chat through `@aituber-onair/core`
+- xAI Grok 4.5 exposes `reasoning_effort` and defaults to `low`; Grok 4.3 defaults to `none` for lower latency
+- TTS playback and real-time audio analysis
+- Speech input through Web Speech API
+- YouTube Live / Twitch comment ingestion
+- Manual OBS Virtual Camera frame capture through **Settings → Screen Vision**
+  for vision-capable model comments
+- Green screen background mode and a solo broadcast layout with pet-only
+  captions from **Settings → Visual**
+- Comment intelligence and manneri detection
+
+## Screen Vision
+
+Start OBS Virtual Camera, choose it from **Settings → Screen Vision**, then press
+**画面を見る** to send the current frame to the selected vision-capable model.
+You can also choose an automatic interval such as 30 seconds, 1 minute,
+2 minutes, or 5 minutes.
+
+## Broadcast visuals
+
+Use **Settings → Visual** to switch the background to green screen and select
+the solo broadcast layout. In solo broadcast layout, the normal chat log is
+hidden and only the pet's latest spoken text is shown as a lower caption. The
+user input field is hidden by default, but can be enabled in the same Visual
+settings section.
+
+## Pet animation
+
+The pet is loaded from:
+
+```text
+public/pet/pet.json
+public/pet/spritesheet.webp
+```
+
+The included sample uses an 8x9 Codex Pet spritesheet with 192x208 cells.
+Rows are interpreted as:
+
+| Row | State |
+| --- | --- |
+| 0 | idle |
+| 1 | running-right |
+| 2 | running-left |
+| 3 | waving |
+| 4 | jumping |
+| 5 | failed |
+| 6 | waiting |
+| 7 | running |
+| 8 | review |
+
+During chat, the pet reacts to app state:
+
+- Processing: review animation
+- Speaking: waving / jumping based on audio volume
+- Happy replies: runs around the stage
+- Failed or apologetic replies: failed animation
+
+## Setup
+
+```bash
+cd packages/core/examples/react-pet-app
+npm install
+npm run dev
+```
+
+Open Settings and configure LLM / TTS providers.
+Settings are saved in `localStorage` under `react-pet-app-settings`.
+The LLM section also lets you edit the system prompt. It is applied when the
+field loses focus and is saved with the other settings.
+
+## Replacing the pet
+
+Open the Pet section in Settings to register another Codex Pet-compatible
+package. Select `pet.json` and the spritesheet image, then press Register. The
+custom pet is stored in the browser and remains active after a reload.
+
+Use the reset button to return to the bundled Miko pet.
+
+The manifest should look like this:
+
+```json
+{
+  "id": "miko",
+  "displayName": "Miko",
+  "description": "A tiny animated pet.",
+  "spritesheetPath": "spritesheet.webp"
+}
+```
+
+For development-time defaults, replace `public/pet/pet.json` and
+`public/pet/spritesheet.webp`.
+
+Keep generated or local-only pet assets out of commits unless you have the
+right to redistribute them.
+
+## Bundled Miko asset terms
+
+The default Pet spritesheet depicts Miko, the official character of AITuber
+OnAir. It is not covered by the software's MIT License. See
+[Miko Asset Terms](./MIKO_ASSET_TERMS.md) for a link to the
+authoritative Japanese guidelines. The asset may be distributed as an integral part of a
+work or other content, but standalone redistribution and asset collections are
+prohibited.

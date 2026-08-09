@@ -19,6 +19,7 @@
   <a href="https://aituberonair.com">Web アプリを試す</a> ・
   <a href="./docs/quickstart.ja.md">クイックスタート</a> ・
   <a href="./docs/examples.ja.md">サンプル一覧</a> ・
+  <a href="./docs/avatar.ja.md">アバターガイド</a> ・
   <a href="#パッケージ">パッケージ</a>
 </p>
 
@@ -53,8 +54,9 @@ npm run dev
 
 ### 2. スターターアプリを作成する
 
-`create-aituber-onair` を使うと、公式の PNGTuber / VRM / Live2D スターター
-テンプレートから自分の AITuber OnAir アプリを作成できます。
+`create-aituber-onair` を使うと、公式の PNGTuber / VRM / Live2D / Pet /
+ぷるぷる PNGTuber / PSD / Inochi2D スターターから自分の AITuber OnAir
+アプリを作成できます。
 
 ```bash
 npm create aituber-onair@latest
@@ -74,7 +76,7 @@ npm run dev
 
 ### 3. サンプルアプリをローカルで動かす
 
-`@aituber-onair/core` をベースにしたフル機能の React サンプルを4種類用意しています。プロジェクトに合うアバター方式を選んでください。LLM / TTS プロバイダー対応範囲と **Settings** UI はどれも共通です。
+`@aituber-onair/core` をベースにしたフル機能の React サンプルを用意しています。プロジェクトに合うアバター方式を選んでください。LLM / TTS プロバイダー対応範囲と **Settings** UI はどれも共通です。
 
 #### PNGTuber Chat — 2D PNG アバター
 
@@ -85,6 +87,19 @@ npm run dev
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
 cd aituber-onair/packages/core/examples/react-pngtuber-app
+npm install
+npm run dev
+```
+
+#### ぷるぷるPNGTuber Chat — 髪が揺れる 2D アバター
+
+![ぷるぷるPNGTuber サンプルアプリ](./packages/core/examples/react-purupuru-app/images/react-purupuru-app.png)
+
+`.purupuru` 形式のアバターパッケージ（1ファイル）を読み込むだけで、アイドルモーション・まばたき・音声駆動リップシンク・髪のバネ物理・振り向き（疑似奥行きパララックス付き）・感情タグによるリアクションが動きます。カメラやトラッキングは不要です。AITuber OnAir 公式キャラクター「ミコ」をデフォルトアバターとして同梱しています。アバター形式とモーション表現は rotejin さんが開発された [ぷるぷるPNGTuber](https://github.com/rotejin/PuruPuruPNGTuber) によるもので、このサンプルはその AITuber 向け移植です。詳細は [`packages/core/examples/react-purupuru-app`](./packages/core/examples/react-purupuru-app) を参照。
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-purupuru-app
 npm install
 npm run dev
 ```
@@ -104,11 +119,12 @@ npm run dev
 
 #### FBX Chat — 3D FBX アバター
 
-任意の FBX キャラクター（`avatar.fbx`）を表示し、任意の `idle.fbx` と
-`talk.fbx` を合成できます。音声出力に合わせた口元・顎の動き、軽い待機
-モーション、感情タグに合わせた表情モーフ、カメラ操作、YouTube / Twitch の
-ライブコメント連携に対応します。
-詳細は [`packages/core/examples/react-fbx-app`](./packages/core/examples/react-fbx-app) を参照。
+任意の `idle.fbx` と `talk.fbx` を含む FBX キャラクターを読み込めます。
+音声出力に合わせた口元または顎の動き、待機モーション、感情タグに応じた
+表情モーフ、カメラ操作、YouTube / Twitch のライブコメント連携に対応します。
+詳細は
+[`packages/core/examples/react-fbx-app`](./packages/core/examples/react-fbx-app)
+を参照してください。
 
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
@@ -135,6 +151,51 @@ npm run dev
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
 cd aituber-onair/packages/core/examples/react-live2d-app
+npm install
+npm run dev
+```
+
+#### Inochi2D Chat — Inochi2D アバター（実験的）
+
+![Inochi2D サンプルアプリ](./packages/core/examples/react-inochi2d-app/images/react-inochi2d-app.png)
+
+ビルド済みの Inochi2D ランタイムを使って Inochi2D アバターを WebGL ステージに描画し、実際の音声出力ボリュームに合わせて口元を動かします。このサンプルは初回表示用に Aka Inochi2D モデルを同梱しています。ローカルの `.inx` / `.inp` ファイルを読み込むか、`public/inochi2d/manifest.json` に別モデルを登録することもできます。詳細は [`packages/core/examples/react-inochi2d-app`](./packages/core/examples/react-inochi2d-app) を参照。
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-inochi2d-app
+npm install
+npm run dev
+```
+
+#### Pet Chat — アニメーションする Codex Pet 風スプライト
+
+![Pet サンプルアプリ](./packages/core/examples/react-pet-app/images/react-pet-app.jpg)
+
+Codex Pet 互換のスプライトシートを描画し、ステージ内を動き回らせながら、チャット状態、応答の雰囲気、実際の音声出力ボリュームに応じてアニメーションを切り替えます。詳細は [`packages/core/examples/react-pet-app`](./packages/core/examples/react-pet-app) を参照。
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-pet-app
+npm install
+npm run dev
+```
+
+#### PSD 立ち絵 Chat — PSDTool / Anime2.5DRig 互換の 2D 立ち絵アバター
+
+![PSD 立ち絵サンプルアプリ](./packages/core/examples/react-psd-app/images/react-psd-app.webp)
+
+1つの PSD ファイルを実行時に読み込み、PSD レイヤーを canvas に合成し、
+リアルタイムリップシンクとまばたきで口・目レイヤーを動かします。
+PSDTool 風の先頭 `!` 強制表示 / 先頭 `*` radio layer と、
+Anime2.5DRig 互換レイヤー名による motion mode の両方に対応しています。
+同梱の `sample.psd` は追加設定なしで動きます。詳細は
+[`packages/core/examples/react-psd-app`](./packages/core/examples/react-psd-app)
+を参照。
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-psd-app
 npm install
 npm run dev
 ```
@@ -174,6 +235,8 @@ await chat.processChat(
   テンプレート選択、プロバイダー設定、ローカル起動まで。
 - [サンプル一覧](./docs/examples.ja.md): フル機能の AI VTuber アプリ、
   パッケージ別サンプル、Bot サンプル、ローカル実行例の選び方。
+- [アバターガイド](./docs/avatar.ja.md): アバター方式の選び方と、
+  AI キャラクター表現を豊かにする拡張方法。
 
 ## パッケージ
 
@@ -184,7 +247,9 @@ await chat.processChat(
 </p>
 
 公式スターターテンプレートから AITuber OnAir アプリを作成する CLI。
-現時点では、スターターアセット同梱の PNGTuber / VRM テンプレートに対応しています。
+PNGTuber / VRM / Live2D / Pet / ぷるぷる PNGTuber / PSD / Inochi2D
+テンプレートに対応しています。Live2D はライセンス対象モデルを同梱せず、
+Inochi2D の大きな Aka サンプルモデルは整合性検証付きで任意取得できます。
 ```bash
 npm create aituber-onair@latest
 ```
@@ -303,7 +368,16 @@ aituber-onair/
 
 ## ライセンス
 
-MIT — 詳細は [LICENSE](./LICENSE) を参照してください。
+ソフトウェアとドキュメントには MIT License が適用されます。詳しくは
+[LICENSE](./LICENSE) を参照してください。
+
+同梱されているミコのアバター画像、モデル、スプライトシート、パッケージは
+MIT License の対象外です。公式サイトの
+[ミコ キャラクター利用ガイドライン](https://miko.aituberonair.com/#terms)
+が適用されます（正式版は日本語版です）。ソフトウェア、アプリ、ゲーム、映像、Webサイトその他の
+作品・コンテンツの一部として一体で再配布できますが、素材単体・素材集としての
+再配布や素材提供を主目的とする配布は禁止されます。英語での概要は
+[Miko Asset Terms](./MIKO_ASSET_TERMS.md)を参照してください。
 
 ## Special Thanks
 
@@ -327,7 +401,13 @@ npm run fmt
 
 ### Agent Skills
 
-Codex と Claude Code の両方で同じ手順を使えるよう、共通の Agent Skills を管理しています。詳しくは [`docs/agent-skills.ja.md`](./docs/agent-skills.ja.md) を参照してください。正本は `skills/` 以下、Claude Code 用の配置は `.claude/skills/` 以下にあります。
+Codex と Claude Code の両方で同じ手順を使えるよう、共通の Agent
+Skills を管理しています。詳しくは
+[`docs/agent-skills.ja.md`](./docs/agent-skills.ja.md) を参照してください。
+Google Colab でローカル LLM を起動する場合は、
+[そのまま使える依頼文](./docs/agent-skills.ja.md#google-colab-ローカル-llm-クイックスタート)
+を利用できます。正本は `skills/` 以下、Claude Code 用の配置は
+`.claude/skills/` 以下にあります。
 
 ### リリース
 

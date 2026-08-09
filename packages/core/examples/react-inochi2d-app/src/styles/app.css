@@ -1,0 +1,267 @@
+.settings-dialog-body {
+  overflow-y: auto;
+}
+
+.settings-dialog-body > .settings-panel {
+  overflow: visible;
+}
+
+.settings-field-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #8899aa;
+  font-size: 0.75rem;
+}
+
+.settings-emotion-mapping-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.settings-field .settings-emotion-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.settings-emotion-mapping-row span {
+  overflow: hidden;
+  color: #b8c4d0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-inline-button {
+  margin-top: 2px;
+}
+
+.inochi2d-model-panel {
+  padding: 16px 16px 0;
+  border-bottom: 1px solid #0f3460;
+}
+
+.inochi2d-model-panel h3 {
+  font-size: 0.85rem;
+  color: #e94560;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.inochi2d-stage {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  pointer-events: auto;
+}
+
+.avatar-effect-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.avatar-effect-canvas.is-back {
+  z-index: 0;
+}
+
+.avatar-effect-canvas.is-front {
+  z-index: 2;
+}
+
+.avatar-effect-canvas.is-anchor-editing {
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.avatar-expression-controls {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 88px);
+  padding: 7px 8px;
+  border: 1px solid rgba(15, 52, 96, 0.9);
+  border-radius: 8px;
+  background: rgba(22, 33, 62, 0.9);
+  pointer-events: auto;
+}
+
+.avatar-expression-controls-label {
+  margin: 0 2px;
+  color: #aabbcc;
+  font-size: 0.72rem;
+}
+
+.avatar-expression-button {
+  padding: 4px 8px;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.avatar-expression-button:hover:not(:disabled),
+.avatar-expression-button:focus-visible {
+  border-color: #e94560;
+  background: #16213e;
+  outline: none;
+}
+
+.avatar-expression-button.is-reset {
+  color: #aabbcc;
+}
+
+.avatar-expression-button.is-active,
+.avatar-expression-button.is-anchor.is-active {
+  border-color: #e94560;
+  background: #3a1930;
+  color: #fff;
+}
+
+.avatar-expression-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.avatar-anchor-editor {
+  position: absolute;
+  top: 58px;
+  left: 16px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 9px 10px;
+  border: 1px solid rgba(233, 69, 96, 0.78);
+  border-radius: 8px;
+  background: rgba(12, 23, 45, 0.94);
+  box-shadow: 0 8px 24px rgba(7, 12, 24, 0.28);
+  color: #d7e0ea;
+  pointer-events: auto;
+}
+
+.avatar-anchor-editor-label {
+  flex-basis: 100%;
+  font-size: 0.72rem;
+  color: #b8c8d8;
+}
+
+.avatar-anchor-targets,
+.avatar-anchor-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.avatar-anchor-scale {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.avatar-anchor-scale input {
+  width: 96px;
+  accent-color: #e94560;
+}
+
+.avatar-anchor-scale output {
+  width: 34px;
+  color: #fff;
+  text-align: right;
+}
+
+.inochi2d-canvas {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.inochi2d-canvas:active,
+.inochi2d-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.inochi2d-status {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(460px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 52, 96, 0.9);
+  border-radius: 10px;
+  background: rgba(22, 33, 62, 0.88);
+  backdrop-filter: blur(10px);
+  color: #d9e5f3;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-align: left;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.inochi2d-status.is-error {
+  border-color: rgba(233, 69, 96, 0.9);
+}
+
+.inochi2d-status strong {
+  color: #e94560;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.inochi2d-active-model,
+.inochi2d-reset-view {
+  position: absolute;
+  z-index: 4;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.inochi2d-active-model {
+  left: 16px;
+  bottom: 16px;
+  padding: 8px 12px;
+  pointer-events: none;
+}
+
+.inochi2d-reset-view {
+  right: 16px;
+  bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+}
+
+.inochi2d-reset-view:hover {
+  background: rgba(0, 0, 0, 0.7);
+}

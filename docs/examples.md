@@ -23,8 +23,21 @@ to the package examples when you need lower-level integration.
   if you already have an FBX character and animation clips for a 3D streaming
   avatar.
 - Use
+  [`packages/core/examples/react-pet-app`](../packages/core/examples/react-pet-app)
+  if you want a small animated pet that reacts to chat state.
+- Use
   [`packages/core/examples/react-live2d-app`](../packages/core/examples/react-live2d-app)
   if you already have Live2D model assets.
+- Use
+  [`packages/core/examples/react-purupuru-app`](../packages/core/examples/react-purupuru-app)
+  if you want a 2D avatar with hair physics and rich idle motion out of the box.
+- Use
+  [`packages/core/examples/react-inochi2d-app`](../packages/core/examples/react-inochi2d-app)
+  if you want an experimental Inochi2D avatar with a prebuilt runtime.
+- Use
+  [`packages/core/examples/react-psd-app`](../packages/core/examples/react-psd-app)
+  if you want a PSDTool-style or Anime2.5DRig-compatible 2D tachie avatar from
+  a single PSD file.
 - Use package examples when you want to embed chat, voice, memory, or streaming
   behavior into an existing application.
 
@@ -44,6 +57,69 @@ from actual audio output volume.
 
 ```bash
 cd packages/core/examples/react-pngtuber-app
+npm install
+npm run dev
+```
+
+### PuruPuru PNGTuber App
+
+<p align="center">
+  <img src="../packages/core/examples/react-purupuru-app/images/react-purupuru-app.png" alt="PuruPuru PNGTuber example app" width="720" />
+</p>
+
+Path:
+[`packages/core/examples/react-purupuru-app`](../packages/core/examples/react-purupuru-app)
+
+Best when you want a lively 2D avatar without preparing tracking or 3D assets.
+It loads a single-file `.purupuru` avatar package and drives idle motion,
+blinking, audio lip-sync, hair spring physics, idle gaze turns, and
+emotion-driven reactions. Miko, the official AITuber OnAir character, is
+bundled as the default avatar. The `.purupuru` avatar format was created by
+rotejin in [PuruPuruPNGTuber](https://github.com/rotejin/PuruPuruPNGTuber);
+this example is an AITuber-oriented reimplementation.
+
+```bash
+cd packages/core/examples/react-purupuru-app
+npm install
+npm run dev
+```
+
+### Inochi2D App (experimental)
+
+<p align="center">
+  <img src="../packages/core/examples/react-inochi2d-app/images/react-inochi2d-app.png" alt="Inochi2D example app" width="720" />
+</p>
+
+Path:
+[`packages/core/examples/react-inochi2d-app`](../packages/core/examples/react-inochi2d-app)
+
+Best for trying Inochi2D avatars. It renders an Inochi2D model on a WebGL stage
+using a prebuilt Inochi2D runtime and drives mouth movement from audio output
+volume. It bundles the Aka Inochi2D model for first-run display, and you can
+also load a local `.inx` / `.inp` file or register another model in
+`public/inochi2d/manifest.json`.
+
+```bash
+cd packages/core/examples/react-inochi2d-app
+npm install
+npm run dev
+```
+
+### Pet App
+
+<p align="center">
+  <img src="../packages/core/examples/react-pet-app/images/react-pet-app.jpg" alt="Pet example app" width="720" />
+</p>
+
+Path:
+[`packages/core/examples/react-pet-app`](../packages/core/examples/react-pet-app)
+
+Best for a lightweight animated companion. It renders a Codex Pet-compatible
+spritesheet, moves the pet around the stage, and switches animations from chat
+state, reply mood, and real-time audio volume.
+
+```bash
+cd packages/core/examples/react-pet-app
 npm install
 npm run dev
 ```
@@ -72,8 +148,8 @@ Path:
 [`packages/core/examples/react-fbx-app`](../packages/core/examples/react-fbx-app)
 
 Best when you already have an FBX character rig. It loads `avatar.fbx`,
-optionally blends `idle.fbx` and `talk.fbx`, and drives mouth or jaw motion
-from audio output volume. It also blends matching expression morph targets from
+optionally blends `idle.fbx` and `talk.fbx`, drives mouth or jaw motion from
+audio output volume, and blends matching expression morph targets from
 screenplay emotion tags during speech.
 
 ```bash
@@ -110,6 +186,26 @@ npm install
 npm run dev
 ```
 
+### PSD Tachie App
+
+<p align="center">
+  <img src="../packages/core/examples/react-psd-app/images/react-psd-app.webp" alt="PSD Tachie example app" width="720" />
+</p>
+
+Path:
+[`packages/core/examples/react-psd-app`](../packages/core/examples/react-psd-app)
+
+Best when you want to load a PSDTool-style or Anime2.5DRig-compatible 2D tachie
+avatar from one PSD file. It composites PSD layers on canvas, drives mouth and
+eye layers with lip-sync and blinking, and includes a bundled motion sample
+that works with zero setup.
+
+```bash
+cd packages/core/examples/react-psd-app
+npm install
+npm run dev
+```
+
 ## Core Examples
 
 - [`packages/core/examples/react-basic`](../packages/core/examples/react-basic):
@@ -122,17 +218,21 @@ npm run dev
 
 - [`packages/chat/examples/node-basic`](../packages/chat/examples/node-basic):
   Node.js examples for basic chat, provider-specific calls, vision, tool
-  calling, and streaming.
+  calling, and streaming. Providers whose APIs cannot be called directly from
+  the browser are also tried here — currently that is only Sakana AI Fugu
+  (`sakana-example.js`), whose API does not allow browser CORS requests.
 - [`packages/chat/examples/react-basic`](../packages/chat/examples/react-basic):
-  browser-based React chat usage.
+  browser-based React chat usage. Providers whose APIs cannot be called
+  directly from the browser are shown disabled in this example — currently
+  that is only Sakana AI — and can be tried from node-basic or through your
+  own backend proxy instead.
 - [`packages/chat/examples/local-llm-cli`](../packages/chat/examples/local-llm-cli):
   interactive CLI for local or self-hosted OpenAI-compatible LLM servers.
 - [`packages/chat/examples/agent-providers`](../packages/chat/examples/agent-providers):
-  examples for Agent SDK backed providers such as Codex, Claude, and Copilot.
+  examples for Agent SDK backed providers such as Codex, Claude, and Copilot,
+  including an experimental Codex character chat CLI.
 - [`packages/chat/examples/character-agent`](../packages/chat/examples/character-agent):
   secretary-style character agent with tools, JSON storage, and tests.
-- [`packages/chat/examples/codex-character-chat`](../packages/chat/examples/codex-character-chat):
-  experimental character chat CLI using the Codex agent provider.
 - [`packages/chat/examples/compat-probe`](../packages/chat/examples/compat-probe):
   compatibility probe for OpenAI-compatible chat endpoints.
 - [`packages/chat/examples/mock-openai-server`](../packages/chat/examples/mock-openai-server):
@@ -142,9 +242,8 @@ npm run dev
 - [`packages/chat/examples/slack-bot`](../packages/chat/examples/slack-bot):
   Slack bot example.
 - [`packages/chat/examples/gas-basic`](../packages/chat/examples/gas-basic):
-  Google Apps Script chat example.
-- [`packages/chat/examples/gas-forms-autodraft-openai`](../packages/chat/examples/gas-forms-autodraft-openai):
-  Google Forms auto-draft example with OpenAI.
+  Google Apps Script chat example, including a Google Forms → Gmail draft
+  recipe with OpenAI.
 
 ## Voice Examples
 

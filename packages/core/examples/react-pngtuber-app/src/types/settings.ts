@@ -1,3 +1,10 @@
+import type { XaiReasoningEffort } from '@aituber-onair/core';
+import type { EmotionEffectAnchor } from '../lib/emotionEffectAnchor';
+import type {
+  PngTuberEmotionEffectMap,
+  PngTuberReactionControlMode,
+} from '../lib/pngtuberEmotionEffects';
+
 export type ChatProviderOption =
   | 'openai'
   | 'openrouter'
@@ -9,6 +16,8 @@ export type ChatProviderOption =
   | 'kimi'
   | 'deepseek'
   | 'mistral'
+  | 'sakana'
+  | 'plamo'
   | 'openai-compatible';
 export type TTSEngineOption =
   | 'openai'
@@ -25,6 +34,7 @@ export type TTSEngineOption =
   | 'inworld'
   | 'gradium'
   | 'piperPlus'
+  | 'webSpeech'
   | 'none';
 export type StreamingPlatformOption = 'none' | 'youtube' | 'twitch';
 
@@ -38,13 +48,17 @@ export interface ProviderApiKeys {
   kimi?: string;
   deepseek?: string;
   mistral?: string;
+  sakana?: string;
+  plamo?: string;
   'openai-compatible'?: string;
 }
 
 export interface LLMSettings {
   provider: ChatProviderOption;
   model: string;
+  systemPrompt: string;
   endpoint?: string;
+  xaiReasoningEffort?: XaiReasoningEffort;
   apiKeys: ProviderApiKeys;
   openRouterDynamicFreeModels?: {
     models: string[];
@@ -118,6 +132,10 @@ export interface TTSSettings {
   piperPlusVoiceFile?: string;
   piperPlusSpeed?: string;
   piperPlusNoiseScale?: string;
+  webSpeechRate?: string;
+  webSpeechPitch?: string;
+  webSpeechVolume?: string;
+  webSpeechLanguage?: string;
 }
 
 export interface StreamSettings {
@@ -137,6 +155,9 @@ export interface CommentIntelligenceSettings {
   enabled: boolean;
   mode: 'rules' | 'hybrid' | 'llm-assisted';
   useSameLLMSettings: boolean;
+  streamTopic: string;
+  streamTitle: string;
+  topicFilter: 'off' | 'prefer' | 'require';
   maxCommentsPerBatch: number;
   analysisIntervalMs: number;
   minCommentsForLLMAnalysis: number;
@@ -152,9 +173,27 @@ export interface ManneriSettings {
   minMessageLength: number;
 }
 
+export interface VisualSettings {
+  backgroundMode: 'default' | 'green';
+  layoutMode: 'chat' | 'broadcast';
+  showInputInBroadcast: boolean;
+  pngtuberEmotionEffectAnchors: Record<string, EmotionEffectAnchor>;
+  pngtuberReactionControlMode: PngTuberReactionControlMode;
+  pngtuberEmotionEffectMap: PngTuberEmotionEffectMap;
+}
+
+export interface ScreenVisionSettings {
+  deviceId: string;
+  prompt: string;
+  autoIntervalMs: number;
+  enabled: boolean;
+}
+
 export interface AppSettings {
   llm: LLMSettings;
   tts: TTSSettings;
+  visual: VisualSettings;
+  screenVision: ScreenVisionSettings;
   stream: StreamSettings;
   commentIntelligence: CommentIntelligenceSettings;
   manneri: ManneriSettings;

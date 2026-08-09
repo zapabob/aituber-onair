@@ -16,7 +16,13 @@ import {
   InworldEngine,
   OpenAiCompatibleEngine,
   PiperPlusEngine,
+  WebSpeechEngine,
   UnrealSpeechEngine,
+  getAllVoiceEngineCapabilities,
+  getVoiceEngineCapabilities,
+  getVoiceEngineVoiceList,
+  getWebSpeechVoiceList,
+  waitForWebSpeechVoices,
   type ElevenLabsApplyTextNormalization,
   type ElevenLabsVoiceSettingsOptions,
   type GradiumOutputFormat,
@@ -25,8 +31,13 @@ import {
   type InworldDeliveryMode,
   type InworldVoiceServiceOptions,
   type UnrealSpeechCodec,
+  type VoiceEngineCapabilities,
+  type VoiceEngineVoice,
+  type VoiceEngineVoiceListOptions,
   type VoicepeakEmotionInput,
   type VoicepeakEmotionWeights,
+  type WebSpeechEngineDependencies,
+  type WebSpeechVoiceServiceOptions,
   XaiEngine,
 } from '../src/index';
 
@@ -39,8 +50,28 @@ describe('Core index voice re-exports', () => {
     expect(typeof InworldEngine).toBe('function');
     expect(typeof OpenAiCompatibleEngine).toBe('function');
     expect(typeof PiperPlusEngine).toBe('function');
+    expect(typeof WebSpeechEngine).toBe('function');
     expect(typeof UnrealSpeechEngine).toBe('function');
     expect(typeof XaiEngine).toBe('function');
+  });
+
+  it('re-exports Web Speech helpers and option types', () => {
+    const dependencies: WebSpeechEngineDependencies = {
+      voiceLoadTimeoutMs: 100,
+    };
+    const options: WebSpeechVoiceServiceOptions = {
+      engineType: 'webSpeech',
+      speaker: '',
+      webSpeechRate: 1,
+      webSpeechPitch: 1,
+      webSpeechVolume: 1,
+      webSpeechLanguage: 'ja-JP',
+    };
+
+    expect(typeof getWebSpeechVoiceList).toBe('function');
+    expect(typeof waitForWebSpeechVoices).toBe('function');
+    expect(dependencies.voiceLoadTimeoutMs).toBe(100);
+    expect(options.engineType).toBe('webSpeech');
   });
 
   it('re-exports voice endpoint constants', () => {
@@ -119,5 +150,30 @@ describe('Core index voice re-exports', () => {
 
     expect(options.gradiumOutputFormat).toBe('wav');
     expect(options.gradiumVoiceSimilarity).toBe(2);
+  });
+
+  it('re-exports voice engine capability helpers', () => {
+    expect(typeof getVoiceEngineVoiceList).toBe('function');
+
+    const capabilities = getVoiceEngineCapabilities('gradium');
+    const sampleCapabilities: VoiceEngineCapabilities = capabilities;
+    const voiceListOptions: VoiceEngineVoiceListOptions = {
+      apiKey: 'test-key',
+    };
+    const voice: VoiceEngineVoice = {
+      id: 'YTpq7expH9539ERJ',
+      label: 'Sample Voice',
+    };
+
+    expect(sampleCapabilities).toEqual(
+      expect.objectContaining({
+        engineType: 'gradium',
+        requiresApiKey: true,
+        supportsVoiceList: true,
+      }),
+    );
+    expect(voiceListOptions.apiKey).toBe('test-key');
+    expect(voice.id).toBe('YTpq7expH9539ERJ');
+    expect(getAllVoiceEngineCapabilities().length).toBeGreaterThan(0);
   });
 });

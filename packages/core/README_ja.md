@@ -61,7 +61,7 @@ pnpm install @aituber-onair/core
 - **テキスト入力からのAI応答生成**：ユーザーのテキスト入力に対して、OpenAI GPTモデルを使用して自然な応答を生成
 - **画像（Vision）入力からのAI応答生成**：配信画面のキャプチャなどの画像に対して、AIが認識した内容に基づく応答を生成
 - **会話の文脈維持と記憶機能**：短期・中期・長期の記憶システムによる長時間の会話の文脈維持
-- **テキストから音声への変換**：複数の音声エンジン（VOICEVOX、VoicePeak、AivisSpeech、Aivis Cloud、OpenAI TTS、Gemini TTS、xAI、Unreal Speech、ElevenLabs、Inworld、Gradium、Piper Plus）に対応
+- **テキストから音声への変換**：複数の音声エンジン（VOICEVOX、VoicePeak、AivisSpeech、Aivis Cloud、OpenAI TTS、Gemini TTS、xAI、Unreal Speech、ElevenLabs、Inworld、Gradium、Piper Plus、Web Speech API）に対応
 - **感情表現の抽出と処理**：AIの応答から感情表現を抽出し、音声合成やアバター表現に活用
 - **イベント駆動型のアーキテクチャ**：処理の各段階でイベントを発行し、外部との連携を容易に
 - **カスタマイズ可能なプロンプト**：Vision処理や会話要約のためのプロンプトをカスタマイズ可能
@@ -1228,6 +1228,10 @@ AITuberOnAirCoreは以下の音声エンジンに対応しています：
 - **OpenAI-Compatible TTS**: 自己ホストやサードパーティーの `/v1/audio/speech` 互換エンドポイント
 - **MiniMax**: 24言語対応の多言語TTS、HD品質対応（APIキーとGroupIdの両方が必要 - 使用例を参照）
 - **Piper Plus**: ONNX Runtime Web と OpenJTalk assets を使うブラウザ内完結の WASM TTS
+- **Web Speech API**: ブラウザ内蔵の音声合成。ブラウザの音声一覧取得と
+  rate、pitch、volume、language の指定に対応します。ブラウザが直接再生し、
+  音声バッファを取得できないため、Core React サンプルの音声解析型
+  リップシンクには対応していません
 - **None**: 音声なしモード（音声出力を行わない）
 
 音声エンジンの切り替えは`updateVoiceService`メソッドで動的に行えます：
@@ -1376,22 +1380,25 @@ aituber.updateVoiceService({
 AITuber OnAir Coreは拡張可能なプロバイダーシステムを採用しており、様々なAI APIとの連携が可能です。
 現在はOpenAI API、OpenAI互換API、Gemini API、Gemini Nano
 （Chrome Built-in AI）、Claude API、xAI API、Z.ai API、Kimi API、
-OpenRouter APIが利用可能です。もし利用したいAPIがあればPRやメッセージをください。
+OpenRouter API、DeepSeek API、Mistral API、Sakana AI、PLaMo が利用可能です。
+もし利用したいAPIがあればPRやメッセージをください。
 
 ### 利用可能なプロバイダー
 
 現在、以下のAIプロバイダーが組み込まれています：
 
-- **OpenAI**: GPT-5系（Nano/Mini/Standard/5.1/5.4/5.5/5.4 Mini/5.4 Nano/5.4 Pro）、GPT-4.1（Mini/Nano含む）、GPT-4o、GPT-4o-mini、O3-mini、o1、o1-miniのモデルをサポート
-- **Gemini**: Gemini 3.5 Flash、Gemini 3.1 Flash-Lite、Gemini 3.1 Pro Preview、Gemini 3 Flash Preview、Gemini 2.5 Pro、Gemini 2.5 Flash、Gemini 2.5 Flash Lite、Gemma 4 31B IT、Gemma 4 26B A4B IT などの推奨モデルをサポート。Gemini 3.5 Flash はチャット用途向けに minimal thinking を自動適用します。deprecated lifecycle model は明示指定用に export を維持
+- **OpenAI**: GPT-5系（Nano/Mini/Standard/5.1/5.4/5.5/5.6 Sol/Terra/Luna/5.4 Mini/5.4 Nano/5.4 Pro）、GPT-4.1（Mini/Nano含む）、GPT-4o、GPT-4o-mini、O3-mini、o1、o1-miniのモデルをサポート。GPT-5.6 系では `max` reasoning effort も利用可能
+- **Gemini**: Gemini 3.6 Flash、Gemini 3.5 Flash / Flash-Lite、Gemini 3.1 Flash-Lite、Gemini 3.1 Pro Preview、Gemini 3 Flash Preview、Gemini 2.5 Pro、Gemini 2.5 Flash、Gemini 2.5 Flash Lite、Gemma 4 31B IT、Gemma 4 26B A4B IT などをサポート。Gemini 3 Flash 系では `reasoning_effort` を設定でき、Flash 系は `minimal`、Pro 系は `low` をチャット向けのデフォルトにします。Gemini 2.5 は引き続き `thinkingBudget` を使用します
 - **Gemini Nano**: Chrome内蔵の `gemini-nano` モデルを API キー不要でサポート（Chrome 138+ かつ Prompt API のフラグ有効化が必要）
-- **Claude**: 現行の Claude API モデル ID として Claude Opus 4.8、Claude Opus 4.7、Claude Opus 4.6、Claude Opus 4.5、Claude Sonnet 4.6、Claude Sonnet 4.5、Claude Haiku 4.5 をサポートし、非推奨ながら引き続き利用可能な Claude 4 Opus、Claude 4 Sonnet、Claude 3 Haiku にも対応しています
-- **xAI**: Grok 4.3、Grok 4.20 系、Grok 4.1 Fast 系モデルをサポート
-- **DeepSeek**: first-class `deepseek` provider として DeepSeek V4 Flash / V4 Pro をサポート
-- **Mistral**: `mistral-small-latest`、`mistral-medium-3-5`、`mistral-large-latest` などの現行 generalist model をサポートし、対応モデルでは adjustable reasoning も利用可能
-- **Z.ai**: GLM-5/GLM-5-Turbo（テキスト専用）、GLM-4.7, GLM-4.7 Flash/FlashX, GLM-4.6, GLM-4.6V, GLM-4.6V Flash/FlashXのモデルをサポート
-- **Kimi**: Kimi K2.6（`kimi-k2.6`）と Kimi K2.5（`kimi-k2.5`、ビジョン対応）をサポート
-- **OpenRouter**: Auto Router、Fusion、latest 系 alias、OpenAI GPT-5.5、Claude、Gemini、Z.ai、Kimi を含む OpenRouter のキュレーション済みモデル一覧をサポート。Fusion は複数モデルのパネルとジャッジモデルを実行するため、内部で使われた各モデル呼び出しと web search/fetch 利用分の合算で課金されます
+- **Claude**: 現行の Claude API モデル ID として Claude Opus 5、Claude Sonnet 5、Claude Opus 4.8、Claude Opus 4.7、Claude Opus 4.6、Claude Opus 4.5、Claude Sonnet 4.6、Claude Sonnet 4.5、Claude Haiku 4.5 をサポートし、非推奨ながら引き続き利用可能な Claude 4 Opus、Claude 4 Sonnet、Claude 3 Haiku にも対応しています。対応モデルでは `reasoning_effort` を Anthropic の `output_config.effort` として送信でき、API のデフォルトは `high` です
+- **xAI**: Grok 4.5、Grok 4.3、Grok 4.20 系、Grok 4.1 Fast 系モデルをサポート。Grok 4.5 の `reasoning_effort` は `low`、Grok 4.3 は低レイテンシ向けに `none` がデフォルトです
+- **DeepSeek**: first-class `deepseek` provider として DeepSeek V4 Flash / V4 Pro をサポート。どちらもモデル別の `reasoning_effort` を利用でき、Core でも Chat の低レイテンシ向けデフォルト `none` を維持しつつ、対応する高い effort へ切り替えられます。現時点では thinking と tool calling を同一リクエストで併用できません
+- **Mistral**: Vision 対応の Ministral 3 系（`ministral-3b-2512`、`ministral-8b-2512`、`ministral-14b-2512`）と、`mistral-small-latest`、`mistral-medium-3-5`、`mistral-large-latest` などの現行 generalist model をサポート。対応モデルでは adjustable reasoning も利用可能
+- **Sakana AI**: first-class `sakana` provider として Fugu（`fugu`）と Fugu Ultra（`fugu-ultra`, `fugu-ultra-20260615`）をサポート。ブラウザ例では CORS により直接呼び出しが失敗する場合があるため disabled 表示にしています。Node.js または backend proxy 経由で利用してください
+- **PLaMo**: first-class `plamo` provider として PLaMo 3.0 Prime（`plamo-3.0-prime`）と PLaMo 2.2 Prime（`plamo-2.2-prime`）をサポート
+- **Z.ai**: GLM-5.2、GLM-5.1、GLM-5/GLM-5-Turbo（テキスト専用）、GLM-5V-Turbo（Vision 対応）、GLM-4.7、GLM-4.7 Flash/FlashX、GLM-4.6、GLM-4.6V、GLM-4.6V Flash/FlashX をサポート
+- **Kimi**: Kimi K3（`kimi-k3`）、Kimi K2.7 Code（`kimi-k2.7-code`）、Kimi K2.7 Code HighSpeed（`kimi-k2.7-code-highspeed`）、Kimi K2.6（`kimi-k2.6`）、Kimi K2.5（`kimi-k2.5`）を Vision 対応でサポート。`reasoning_effort` を公開するモデルでは公式の対応値とデフォルトを使用します。Kimi K3 は `low`、`high`、`max` を指定でき、デフォルトは `max` です。推論自体は無効化できません。Kimi K2.7 Code 系は thinking mode が必須です
+- **OpenRouter**: Auto Router / Auto Router Beta、Fusion、latest 系 alias、OpenAI GPT-5.6、Claude Opus 5、Gemini 3.6 / 3.5、Z.ai GLM-5.2、xAI Grok 4.5、Kimi K3、KAT-Coder V2.5、DeepSeek V4 Flash を含むキュレーション済みモデル一覧をサポート。DeepSeek は、現在の挙動を固定して再現する場合は `deepseek/deepseek-v4-flash-0731` を使い、`deepseek/deepseek-v4-flash` は別の Preview snapshot として扱います。どちらもモデル別の reasoning effort に対応し、応答性を優先する明示的な `none` がデフォルトです。動的ルーターでは、ルーティング先の reasoning model が可視テキストを出す前に出力枠を使い切ることがあるため、`responseLength` 由来の token 上限を省略します。明示指定した `maxTokens` は有効です。上流制約が強いモデルは明示的な選択肢として扱い、Kimi K3 は混雑時に 429 を返す場合があり、Grok 4.5 には地域別の利用制限があります。Fusion は内部で使われた各モデル呼び出しと web search/fetch 利用分の合算で課金されます。OpenRouter GLM-5.2 では chat 側の `reasoning.effort: 'none'` default と automatic `max_tokens` 省略をそのまま利用します
 - **OpenAI-Compatible**: 任意の OpenAI 互換 Chat Completions endpoint をサポートし、Vision 対応は endpoint / model の応答まで `unknown` として扱います
 
 OpenRouterのfree-tierモデル検出には、

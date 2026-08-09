@@ -1,7 +1,10 @@
 import {
   ENDPOINT_ZAI_CHAT_COMPLETIONS_API,
+  MODEL_GLM_5_2,
+  MODEL_GLM_5_1,
   MODEL_GLM_5,
   MODEL_GLM_5_TURBO,
+  MODEL_GLM_5V_TURBO,
   MODEL_GLM_4_7,
   MODEL_GLM_4_7_FLASHX,
   MODEL_GLM_4_7_FLASH,
@@ -69,8 +72,11 @@ export class ZAIChatServiceProvider
    */
   getSupportedModels(): string[] {
     return [
+      MODEL_GLM_5_2,
+      MODEL_GLM_5_1,
       MODEL_GLM_5,
       MODEL_GLM_5_TURBO,
+      MODEL_GLM_5V_TURBO,
       MODEL_GLM_4_7,
       MODEL_GLM_4_7_FLASHX,
       MODEL_GLM_4_7_FLASH,
@@ -85,7 +91,7 @@ export class ZAIChatServiceProvider
    * Get the default model
    */
   getDefaultModel(): string {
-    return MODEL_GLM_4_7;
+    return MODEL_GLM_5_2;
   }
 
   /**

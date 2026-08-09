@@ -1,23 +1,46 @@
 import { useEffect, useMemo, useState } from 'react';
-import { isGPT5Model } from '@aituber-onair/core';
+import {
+  getDefaultXaiReasoningEffort,
+  getVoiceEngineVoiceList,
+  isGPT5Model,
+  isXaiReasoningEffortModel,
+  isXaiReasoningEffortNoneModel,
+  normalizeXaiReasoningEffort,
+  type VoiceEngineVoice,
+  type XaiReasoningEffort,
+} from '@aituber-onair/core';
 import { StreamSettings } from './StreamSettings';
+import { ScreenVisionPanel } from './ScreenVisionPanel';
 import { useGeminiNanoStatus } from '../hooks/useGeminiNanoStatus';
+import { DEFAULT_SYSTEM_PROMPT } from '../constants/prompts';
+import type { useScreenVisionController } from '../hooks/useScreenVisionController';
+import type {
+  PngTuberEmotionEffect,
+  PngTuberReactionControlMode,
+  PngTuberReactionEmotion,
+} from '../lib/pngtuberEmotionEffects';
 import type { ChatProviderOption, TTSEngineOption } from '../types/settings';
 import type { AvatarImageKey, AvatarImageUrls } from './AvatarPanel';
 import type { useSettings } from '../hooks/useSettings';
 
 type SettingsHook = ReturnType<typeof useSettings>;
+type ScreenVisionController = ReturnType<typeof useScreenVisionController>;
 
 interface SettingsPanelProps extends SettingsHook {
   isProcessing: boolean;
   backgroundImageUrl: string | null;
   avatarImageUrls: AvatarImageUrls;
   streamErrorMessage?: string;
+  screenVisionController: ScreenVisionController;
   onBackgroundImageChange: (file: File | null) => void;
   onAvatarImageChange: (key: AvatarImageKey, file: File | null) => void;
 }
 
-const PROVIDERS: { value: ChatProviderOption; label: string }[] = [
+const PROVIDERS: {
+  value: ChatProviderOption;
+  label: string;
+  disabled?: boolean;
+}[] = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'openai-compatible', label: 'OpenAI-Compatible' },
   { value: 'openrouter', label: 'OpenRouter' },
@@ -29,6 +52,8 @@ const PROVIDERS: { value: ChatProviderOption; label: string }[] = [
   { value: 'kimi', label: 'Kimi' },
   { value: 'deepseek', label: 'DeepSeek' },
   { value: 'mistral', label: 'Mistral' },
+  { value: 'sakana', label: 'Sakana AI (Node/backend only)', disabled: true },
+  { value: 'plamo', label: 'PLaMo' },
 ];
 
 const TTS_ENGINES: { value: TTSEngineOption; label: string }[] = [
@@ -46,7 +71,34 @@ const TTS_ENGINES: { value: TTSEngineOption; label: string }[] = [
   { value: 'inworld', label: 'Inworld' },
   { value: 'gradium', label: 'Gradium' },
   { value: 'piperPlus', label: 'Piper Plus' },
+  { value: 'webSpeech', label: 'Web Speech API' },
   { value: 'none', label: 'None' },
+];
+
+const PNGTUBER_REACTION_EMOTION_OPTIONS: ReadonlyArray<{
+  value: PngTuberReactionEmotion;
+  label: string;
+}> = [
+  { value: 'happy', label: '喜び（happy）' },
+  { value: 'surprised', label: '驚き（surprised）' },
+  { value: 'sad', label: '悲しみ（sad）' },
+  { value: 'angry', label: '怒り（angry）' },
+  { value: 'relaxed', label: '安らぎ（relaxed）' },
+  { value: 'thinking', label: '考え中（thinking）' },
+  { value: 'neutral', label: '通常（neutral）' },
+];
+
+const PNGTUBER_EFFECT_OPTIONS: ReadonlyArray<{
+  value: PngTuberEmotionEffect | 'none';
+  label: string;
+}> = [
+  { value: 'none', label: 'なし' },
+  { value: 'happy', label: 'きらめき（happy）' },
+  { value: 'surprised', label: '驚き線（surprised）' },
+  { value: 'sad', label: '涙（sad）' },
+  { value: 'angry', label: '怒りマーク（angry）' },
+  { value: 'relaxed', label: '泡・安らぎ（relaxed）' },
+  { value: 'thinking', label: '思考マーク（thinking）' },
 ];
 
 const OPENAI_SPEAKERS = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
@@ -211,6 +263,7 @@ type SectionKey =
   | 'llm'
   | 'tts'
   | 'visual'
+  | 'emotionEffects'
   | 'stream'
   | 'commentIntelligence'
   | 'manneri';
@@ -227,8 +280,10 @@ export function SettingsPanel({
   availableModels,
   updateLLMProvider,
   updateLLMModel,
+  updateLLMSystemPrompt,
   updateLLMApiKey,
   updateLLMEndpoint,
+  updateXaiReasoningEffort,
   refreshOpenRouterDynamicFreeModels,
   isRefreshingOpenRouterFreeModels,
   openRouterRefreshError,
@@ -262,6 +317,15 @@ export function SettingsPanel({
   updatePiperPlusVoiceFile,
   updatePiperPlusSpeed,
   updatePiperPlusNoiseScale,
+  updateVisualBackgroundMode,
+  updateVisualLayoutMode,
+  updateVisualShowInputInBroadcast,
+  updateVisualPngTuberReactionControlMode,
+  updateVisualPngTuberEmotionEffect,
+  resetVisualPngTuberEmotionEffectMap,
+  updateScreenVisionDeviceId,
+  updateScreenVisionPrompt,
+  updateScreenVisionAutoIntervalMs,
   updateStreamPlatform,
   updateYoutubeApiKey,
   updateYoutubeLiveId,
@@ -274,6 +338,9 @@ export function SettingsPanel({
   updateTwitchCommentIntervalMs,
   updateCommentIntelligenceEnabled,
   updateCommentIntelligenceMode,
+  updateCommentIntelligenceStreamTopic,
+  updateCommentIntelligenceStreamTitle,
+  updateCommentIntelligenceTopicFilter,
   updateCommentIntelligenceAnalysisIntervalMs,
   updateCommentIntelligenceMaxCommentsPerBatch,
   updateCommentIntelligenceMinCommentsForLLMAnalysis,
@@ -289,12 +356,61 @@ export function SettingsPanel({
   backgroundImageUrl,
   avatarImageUrls,
   streamErrorMessage,
+  screenVisionController,
   onBackgroundImageChange,
   onAvatarImageChange,
 }: SettingsPanelProps) {
   const disabled = isProcessing;
+  const [systemPromptDraft, setSystemPromptDraft] = useState(
+    settings.llm.systemPrompt,
+  );
+  const committedEndpoint = settings.llm.endpoint || '';
+  const [endpointDraft, setEndpointDraft] = useState(committedEndpoint);
+  const [endpointError, setEndpointError] = useState('');
+
+  const commitSystemPrompt = () => {
+    if (systemPromptDraft !== settings.llm.systemPrompt) {
+      updateLLMSystemPrompt(systemPromptDraft);
+    }
+  };
+  const commitEndpoint = () => {
+    const endpoint = endpointDraft.trim();
+    let endpointUrl: URL;
+
+    try {
+      endpointUrl = new URL(endpoint);
+    } catch {
+      setEndpointError('Enter a full http:// or https:// URL.');
+      return;
+    }
+
+    if (endpointUrl.protocol !== 'http:' && endpointUrl.protocol !== 'https:') {
+      setEndpointError('Enter a full http:// or https:// URL.');
+      return;
+    }
+
+    setEndpointError('');
+    setEndpointDraft(endpoint);
+    if (endpoint !== committedEndpoint) {
+      updateLLMEndpoint(endpoint);
+    }
+  };
   const isOpenAIGPT5Model =
     settings.llm.provider === 'openai' && isGPT5Model(settings.llm.model);
+  const isXaiReasoningEffortModelSelected =
+    settings.llm.provider === 'xai' &&
+    isXaiReasoningEffortModel(settings.llm.model);
+  const xaiReasoningEffortValue: XaiReasoningEffort =
+    isXaiReasoningEffortModelSelected
+      ? normalizeXaiReasoningEffort(
+          settings.llm.model,
+          settings.llm.xaiReasoningEffort ||
+            getDefaultXaiReasoningEffort(settings.llm.model),
+        ) || 'none'
+      : 'none';
+  const allowsXaiNoneReasoningEffort =
+    settings.llm.provider === 'xai' &&
+    isXaiReasoningEffortNoneModel(settings.llm.model);
   const openRouterApiKey = getApiKeyForProvider('openrouter').trim();
   const openRouterDynamicFreeModels =
     settings.llm.openRouterDynamicFreeModels?.models || [];
@@ -313,6 +429,11 @@ export function SettingsPanel({
     [],
   );
   const [inworldVoices, setInworldVoices] = useState<InworldVoice[]>([]);
+  const [webSpeechVoices, setWebSpeechVoices] = useState<VoiceEngineVoice[]>(
+    [],
+  );
+  const [isFetchingWebSpeechVoices, setIsFetchingWebSpeechVoices] =
+    useState(false);
   const [fetchError, setFetchError] = useState('');
   const [isFetchingMinimaxVoices, setIsFetchingMinimaxVoices] = useState(false);
   const [isFetchingElevenLabsVoices, setIsFetchingElevenLabsVoices] =
@@ -324,6 +445,7 @@ export function SettingsPanel({
     llm: true,
     tts: true,
     visual: true,
+    emotionEffects: true,
     stream: true,
     commentIntelligence: true,
     manneri: true,
@@ -633,6 +755,43 @@ export function SettingsPanel({
     updateTTSSpeaker,
   ]);
 
+  useEffect(() => {
+    if (settings.tts.engine !== 'webSpeech') {
+      return;
+    }
+
+    let active = true;
+    const fetchWebSpeechVoices = async () => {
+      setIsFetchingWebSpeechVoices(true);
+      try {
+        const voices = await getVoiceEngineVoiceList('webSpeech');
+        if (!active) return;
+        setWebSpeechVoices(voices);
+        setFetchError('');
+        if (
+          voices.length > 0 &&
+          !voices.some((voice) => voice.id === settings.tts.speaker)
+        ) {
+          updateTTSSpeaker(voices[0].id);
+        }
+      } catch (error) {
+        if (!active) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setWebSpeechVoices([]);
+        setFetchError(`Web Speech音声一覧エラー: ${message}`);
+      } finally {
+        if (active) {
+          setIsFetchingWebSpeechVoices(false);
+        }
+      }
+    };
+
+    void fetchWebSpeechVoices();
+    return () => {
+      active = false;
+    };
+  }, [settings.tts.engine, settings.tts.speaker, updateTTSSpeaker]);
+
   const handleAivisCloudPresetChange = (presetId: string) => {
     const preset = AIVIS_CLOUD_PRESETS.find((item) => item.id === presetId);
     if (!preset) return;
@@ -681,12 +840,37 @@ export function SettingsPanel({
                 disabled={disabled}
               >
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value}>
+                  <option key={p.value} value={p.value} disabled={p.disabled}>
                     {p.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            {settings.llm.provider !== 'gemini-nano' && (
+              <div className="settings-field">
+                <label htmlFor="llm-apikey">
+                  API Key ({settings.llm.provider})
+                  {settings.llm.provider === 'openai-compatible'
+                    ? ' - optional'
+                    : ''}
+                </label>
+                <input
+                  id="llm-apikey"
+                  type="password"
+                  value={getApiKeyForProvider(settings.llm.provider)}
+                  onChange={(e) =>
+                    updateLLMApiKey(settings.llm.provider, e.target.value)
+                  }
+                  placeholder={
+                    settings.llm.provider === 'openai-compatible'
+                      ? 'optional'
+                      : 'XXX-...'
+                  }
+                  disabled={disabled}
+                />
+              </div>
+            )}
 
             <div className="settings-field">
               <label htmlFor="llm-model">Model</label>
@@ -715,29 +899,61 @@ export function SettingsPanel({
               )}
             </div>
 
-            {settings.llm.provider === 'openrouter' && (
-              <div className="settings-field">
-                <label htmlFor="llm-apikey">
-                  API Key ({settings.llm.provider})
-                </label>
-                <input
-                  id="llm-apikey"
-                  type="password"
-                  value={getApiKeyForProvider(settings.llm.provider)}
-                  onChange={(e) =>
-                    updateLLMApiKey(settings.llm.provider, e.target.value)
-                  }
-                  placeholder="XXX-..."
-                  disabled={disabled}
-                />
-              </div>
-            )}
+            <div className="settings-field">
+              <label htmlFor="llm-system-prompt">System Prompt</label>
+              <textarea
+                id="llm-system-prompt"
+                rows={6}
+                value={systemPromptDraft}
+                onChange={(event) => setSystemPromptDraft(event.target.value)}
+                onBlur={commitSystemPrompt}
+                placeholder={DEFAULT_SYSTEM_PROMPT}
+                disabled={disabled}
+              />
+              <p className="settings-field-hint">
+                入力欄からフォーカスが外れた時に反映されます。空欄の場合は
+                既定値を使用します。アバター固有の制御指示を削除すると、
+                感情表現エフェクトの連動に影響する場合があります。
+              </p>
+            </div>
 
             {isOpenAIGPT5Model && (
               <p className="settings-field-hint">
                 GPT-5 models use the Casual preset and Very Short replies in
                 this sample.
               </p>
+            )}
+
+            {settings.llm.provider === 'xai' && (
+              <div className="settings-field">
+                <label htmlFor="xai-reasoning-effort">
+                  xAI Reasoning Effort
+                </label>
+                <select
+                  id="xai-reasoning-effort"
+                  value={xaiReasoningEffortValue}
+                  onChange={(e) =>
+                    updateXaiReasoningEffort(
+                      e.target.value as XaiReasoningEffort,
+                    )
+                  }
+                  disabled={disabled || !isXaiReasoningEffortModelSelected}
+                >
+                  {allowsXaiNoneReasoningEffort && (
+                    <option value="none">None</option>
+                  )}
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+                <p className="settings-field-hint">
+                  {isXaiReasoningEffortModelSelected
+                    ? settings.llm.model === 'grok-4.5'
+                      ? 'Grok 4.5 uses low by default; none is not supported.'
+                      : 'Grok 4.3 uses none by default for lower latency.'
+                    : 'This xAI model does not support reasoning_effort.'}
+                </p>
+              </div>
             )}
 
             {settings.llm.provider === 'openrouter' && (
@@ -806,11 +1022,29 @@ export function SettingsPanel({
                 <input
                   id="llm-endpoint"
                   type="text"
-                  value={settings.llm.endpoint || ''}
-                  onChange={(e) => updateLLMEndpoint(e.target.value)}
+                  value={endpointDraft}
+                  onChange={(event) => {
+                    setEndpointDraft(event.target.value);
+                    setEndpointError('');
+                  }}
+                  onBlur={commitEndpoint}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  aria-invalid={endpointError ? true : undefined}
+                  aria-describedby={
+                    endpointError ? 'llm-endpoint-error' : undefined
+                  }
                   placeholder="http://localhost:11434/v1/chat/completions"
                   disabled={disabled}
                 />
+                {endpointError && (
+                  <p id="llm-endpoint-error" className="settings-field-error">
+                    {endpointError}
+                  </p>
+                )}
               </div>
             )}
 
@@ -853,32 +1087,6 @@ export function SettingsPanel({
                 </div>
               </>
             )}
-
-            {settings.llm.provider !== 'openrouter' &&
-              settings.llm.provider !== 'gemini-nano' && (
-                <div className="settings-field">
-                  <label htmlFor="llm-apikey">
-                    API Key ({settings.llm.provider})
-                    {settings.llm.provider === 'openai-compatible'
-                      ? ' - optional'
-                      : ''}
-                  </label>
-                  <input
-                    id="llm-apikey"
-                    type="password"
-                    value={getApiKeyForProvider(settings.llm.provider)}
-                    onChange={(e) =>
-                      updateLLMApiKey(settings.llm.provider, e.target.value)
-                    }
-                    placeholder={
-                      settings.llm.provider === 'openai-compatible'
-                        ? 'optional'
-                        : 'XXX-...'
-                    }
-                    disabled={disabled}
-                  />
-                </div>
-              )}
           </>
         )}
       </div>
@@ -1874,6 +2082,102 @@ export function SettingsPanel({
               </>
             )}
 
+            {settings.tts.engine === 'webSpeech' && (
+              <>
+                <div className="settings-field">
+                  <label htmlFor="tts-web-speech-voice">Browser Voice</label>
+                  <select
+                    id="tts-web-speech-voice"
+                    value={settings.tts.speaker}
+                    onChange={(e) => updateTTSSpeaker(e.target.value)}
+                    disabled={disabled || isFetchingWebSpeechVoices}
+                  >
+                    {webSpeechVoices.length > 0 ? (
+                      webSpeechVoices.map((voice) => (
+                        <option key={voice.id} value={voice.id}>
+                          {voice.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">
+                        {isFetchingWebSpeechVoices
+                          ? 'Loading browser voices...'
+                          : 'Browser default voice'}
+                      </option>
+                    )}
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="tts-web-speech-language">Language</label>
+                  <input
+                    id="tts-web-speech-language"
+                    type="text"
+                    value={settings.tts.webSpeechLanguage || ''}
+                    onChange={(e) =>
+                      updateTtsField('webSpeechLanguage', e.target.value)
+                    }
+                    placeholder="ja-JP"
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="tts-web-speech-rate">Rate (0.1 - 10)</label>
+                  <input
+                    id="tts-web-speech-rate"
+                    type="number"
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    value={settings.tts.webSpeechRate || ''}
+                    onChange={(e) =>
+                      updateTtsField('webSpeechRate', e.target.value)
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="tts-web-speech-pitch">Pitch (0 - 2)</label>
+                  <input
+                    id="tts-web-speech-pitch"
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={settings.tts.webSpeechPitch || ''}
+                    onChange={(e) =>
+                      updateTtsField('webSpeechPitch', e.target.value)
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="tts-web-speech-volume">Volume (0 - 1)</label>
+                  <input
+                    id="tts-web-speech-volume"
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={settings.tts.webSpeechVolume || ''}
+                    onChange={(e) =>
+                      updateTtsField('webSpeechVolume', e.target.value)
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="settings-field">
+                  <small>
+                    Web Speech API はブラウザが直接再生します。音声バッファを
+                    取得できないため、このサンプルのリップシンクには対応して
+                    いません。
+                  </small>
+                  {fetchError.startsWith('Web Speech') && (
+                    <small className="settings-field-error">{fetchError}</small>
+                  )}
+                </div>
+              </>
+            )}
+
             {settings.tts.engine === 'openaiCompatible' && (
               <>
                 <div className="settings-field">
@@ -2194,6 +2498,52 @@ export function SettingsPanel({
         {expandedSections.visual && (
           <>
             <div className="settings-field">
+              <label htmlFor="visual-background-mode">背景モード</label>
+              <select
+                id="visual-background-mode"
+                value={settings.visual.backgroundMode}
+                onChange={(e) =>
+                  updateVisualBackgroundMode(
+                    e.target.value as 'default' | 'green',
+                  )
+                }
+                disabled={disabled}
+              >
+                <option value="default">通常背景</option>
+                <option value="green">グリーンバック</option>
+              </select>
+            </div>
+
+            <div className="settings-field">
+              <label htmlFor="visual-layout-mode">表示モード</label>
+              <select
+                id="visual-layout-mode"
+                value={settings.visual.layoutMode}
+                onChange={(e) =>
+                  updateVisualLayoutMode(e.target.value as 'chat' | 'broadcast')
+                }
+                disabled={disabled}
+              >
+                <option value="chat">通常チャット</option>
+                <option value="broadcast">ソロ配信</option>
+              </select>
+            </div>
+
+            <label className="settings-checkbox-field">
+              <input
+                type="checkbox"
+                checked={settings.visual.showInputInBroadcast}
+                onChange={(e) =>
+                  updateVisualShowInputInBroadcast(e.target.checked)
+                }
+                disabled={
+                  disabled || settings.visual.layoutMode !== 'broadcast'
+                }
+              />
+              <span>ソロ配信で入力欄を表示</span>
+            </label>
+
+            <div className="settings-field">
               <label htmlFor="background-image">背景画像</label>
               <div className="settings-file-picker-row">
                 <input
@@ -2281,6 +2631,115 @@ export function SettingsPanel({
         )}
       </div>
 
+      <div className="settings-section">
+        <button
+          type="button"
+          className="settings-section-toggle"
+          onClick={() => toggleSection('emotionEffects')}
+          aria-expanded={expandedSections.emotionEffects}
+        >
+          <h3>感情表現エフェクト</h3>
+          <span
+            className={`settings-section-chevron${expandedSections.emotionEffects ? ' is-open' : ''}`}
+          >
+            ⌄
+          </span>
+        </button>
+
+        {expandedSections.emotionEffects && (
+          <>
+            <div className="settings-field">
+              <label htmlFor="pngtuber-reaction-control-mode">操作方法</label>
+              <select
+                id="pngtuber-reaction-control-mode"
+                value={settings.visual.pngtuberReactionControlMode}
+                onChange={(event) =>
+                  updateVisualPngTuberReactionControlMode(
+                    event.target.value as PngTuberReactionControlMode,
+                  )
+                }
+                disabled={disabled}
+              >
+                <option value="none">なし</option>
+                <option value="manual">手動ボタン</option>
+                <option value="linked">発話感情に連動のみ</option>
+              </select>
+              <p className="settings-field-hint">
+                {settings.visual.pngtuberReactionControlMode === 'none'
+                  ? '手動ボタンを表示せず、発話時のエフェクトも再生しません。'
+                  : settings.visual.pngtuberReactionControlMode === 'manual'
+                    ? 'アバター上のボタンからCanvasエフェクトをプレビューします。'
+                    : '発話の emotion タグを受け取った時点でCanvasエフェクトを再生します。'}
+              </p>
+            </div>
+
+            <div className="settings-field">
+              <span className="settings-field-label">
+                感情とエフェクトの対応
+              </span>
+              <div className="settings-emotion-mapping-list">
+                {PNGTUBER_REACTION_EMOTION_OPTIONS.map((emotionOption) => (
+                  <label
+                    key={emotionOption.value}
+                    className="settings-emotion-mapping-row"
+                    htmlFor={`pngtuber-effect-${emotionOption.value}`}
+                  >
+                    <span>{emotionOption.label}</span>
+                    <select
+                      id={`pngtuber-effect-${emotionOption.value}`}
+                      value={
+                        settings.visual.pngtuberEmotionEffectMap[
+                          emotionOption.value
+                        ] || 'none'
+                      }
+                      onChange={(event) => {
+                        const effect = event.target.value;
+                        updateVisualPngTuberEmotionEffect(
+                          emotionOption.value,
+                          effect === 'none'
+                            ? null
+                            : (effect as PngTuberEmotionEffect),
+                        );
+                      }}
+                      disabled={disabled}
+                    >
+                      {PNGTUBER_EFFECT_OPTIONS.map((effectOption) => (
+                        <option
+                          key={effectOption.value}
+                          value={effectOption.value}
+                        >
+                          {effectOption.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="settings-clear-button settings-inline-button"
+                onClick={resetVisualPngTuberEmotionEffectMap}
+                disabled={disabled}
+              >
+                感情の割り当てを初期値に戻す
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="settings-section">
+        <h3>Screen Vision</h3>
+        <ScreenVisionPanel
+          disabled={disabled}
+          settings={settings.screenVision}
+          controller={screenVisionController}
+          onDeviceIdChange={updateScreenVisionDeviceId}
+          onPromptChange={updateScreenVisionPrompt}
+          onAutoIntervalMsChange={updateScreenVisionAutoIntervalMs}
+        />
+      </div>
+
       <StreamSettings
         stream={settings.stream}
         commentIntelligence={settings.commentIntelligence}
@@ -2305,6 +2764,15 @@ export function SettingsPanel({
         updateTwitchCommentIntervalMs={updateTwitchCommentIntervalMs}
         updateCommentIntelligenceEnabled={updateCommentIntelligenceEnabled}
         updateCommentIntelligenceMode={updateCommentIntelligenceMode}
+        updateCommentIntelligenceStreamTopic={
+          updateCommentIntelligenceStreamTopic
+        }
+        updateCommentIntelligenceStreamTitle={
+          updateCommentIntelligenceStreamTitle
+        }
+        updateCommentIntelligenceTopicFilter={
+          updateCommentIntelligenceTopicFilter
+        }
         updateCommentIntelligenceAnalysisIntervalMs={
           updateCommentIntelligenceAnalysisIntervalMs
         }

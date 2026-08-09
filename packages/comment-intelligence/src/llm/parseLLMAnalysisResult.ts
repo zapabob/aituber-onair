@@ -1,4 +1,4 @@
-import type { LLMCommentAnalysisResult } from '../types/llm';
+import type { LLMCommentAnalysisResult } from '../types/llm.js';
 
 export function parseLLMAnalysisResult(text: string): LLMCommentAnalysisResult {
   const jsonText = extractJson(text);
@@ -39,6 +39,11 @@ function normalizeResult(
   return {
     selectedCommentIds: Array.isArray(value.selectedCommentIds)
       ? value.selectedCommentIds.filter(
+          (id): id is string => typeof id === 'string'
+        )
+      : undefined,
+    topicRelatedCommentIds: Array.isArray(value.topicRelatedCommentIds)
+      ? value.topicRelatedCommentIds.filter(
           (id): id is string => typeof id === 'string'
         )
       : undefined,

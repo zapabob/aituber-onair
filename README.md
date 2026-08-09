@@ -19,6 +19,7 @@
   <a href="https://aituberonair.com">Try the hosted web app</a> ・
   <a href="./docs/quickstart.md">Quickstart</a> ・
   <a href="./docs/examples.md">Examples</a> ・
+  <a href="./docs/avatar.md">Avatar Guide</a> ・
   <a href="#packages">Packages</a>
 </p>
 
@@ -54,8 +55,8 @@ walkthrough.
 
 ### 2. Create a starter app
 
-Use `create-aituber-onair` to scaffold your own app from an official PNGTuber,
-VRM, or Live2D starter template.
+Use `create-aituber-onair` to scaffold your own app from the official
+PNGTuber, VRM, Live2D, Pet, PuruPuru, PSD, or Inochi2D starter templates.
 
 ```bash
 npm create aituber-onair@latest
@@ -75,8 +76,8 @@ For step-by-step setup and template selection, see
 
 ### 3. Run an example app locally
 
-Four full, ready-to-run React apps built on `@aituber-onair/core`. Pick the
-avatar style that fits your project. All four share the same broad LLM / TTS
+Full, ready-to-run React apps built on `@aituber-onair/core`. Pick the
+avatar style that fits your project. All of them share the same broad LLM / TTS
 provider coverage and in-app **Settings** UI.
 
 #### PNGTuber Chat — 2D PNG avatar
@@ -88,6 +89,26 @@ Swap in 4 PNG states (mouth/eyes open/close) and get real-time lip-sync driven f
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
 cd aituber-onair/packages/core/examples/react-pngtuber-app
+npm install
+npm run dev
+```
+
+#### PuruPuru PNGTuber Chat — 2D avatar with hair physics
+
+![PuruPuru PNGTuber example app](./packages/core/examples/react-purupuru-app/images/react-purupuru-app.png)
+
+Load a single-file `.purupuru` avatar package and get idle motion, blinking,
+audio-driven lip-sync, hair spring physics, idle gaze turns with pseudo-depth
+parallax, and emotion-driven reactions — no camera or tracking required. Miko,
+the official AITuber OnAir character, is bundled as the default avatar. The
+avatar format and motion design were created by rotejin in
+[PuruPuruPNGTuber](https://github.com/rotejin/PuruPuruPNGTuber); this example is
+an AITuber-oriented reimplementation. See
+[`packages/core/examples/react-purupuru-app`](./packages/core/examples/react-purupuru-app).
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-purupuru-app
 npm install
 npm run dev
 ```
@@ -107,11 +128,11 @@ npm run dev
 
 #### FBX Chat — 3D FBX avatar
 
-Render your own FBX character (`avatar.fbx`) with optional `idle.fbx` and
-`talk.fbx` animation clips, audio-driven mouth/jaw motion, procedural idle
-motion, emotion-tag expression morphs, camera controls, and the same YouTube /
-Twitch live-comment pipeline.
-See [`packages/core/examples/react-fbx-app`](./packages/core/examples/react-fbx-app).
+Load an FBX character with optional `idle.fbx` and `talk.fbx` animation clips.
+The example provides audio-driven mouth or jaw movement, procedural idle motion,
+emotion-tag expression morphs, camera controls, and the YouTube / Twitch
+live-comment pipeline. See
+[`packages/core/examples/react-fbx-app`](./packages/core/examples/react-fbx-app).
 
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
@@ -141,6 +162,56 @@ example intentionally does not bundle any Live2D assets. See
 ```bash
 git clone https://github.com/shinshin86/aituber-onair.git
 cd aituber-onair/packages/core/examples/react-live2d-app
+npm install
+npm run dev
+```
+
+#### Inochi2D Chat — Inochi2D avatar (experimental)
+
+![Inochi2D example app](./packages/core/examples/react-inochi2d-app/images/react-inochi2d-app.png)
+
+Render an Inochi2D avatar on a WebGL stage with a prebuilt Inochi2D runtime, and
+drive mouth movement from actual audio output volume. This example bundles the
+Aka Inochi2D model for first-run display, and you can also load a local `.inx` /
+`.inp` file or register another model in `public/inochi2d/manifest.json`. See
+[`packages/core/examples/react-inochi2d-app`](./packages/core/examples/react-inochi2d-app).
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-inochi2d-app
+npm install
+npm run dev
+```
+
+#### Pet Chat — animated Codex Pet-style sprite
+
+![Pet example app](./packages/core/examples/react-pet-app/images/react-pet-app.jpg)
+
+Render a Codex Pet-compatible spritesheet, move it around the stage, and switch
+animations from chat state, reply mood, and real-time audio volume. See
+[`packages/core/examples/react-pet-app`](./packages/core/examples/react-pet-app).
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-pet-app
+npm install
+npm run dev
+```
+
+#### PSD Tachie Chat — PSDTool / Anime2.5DRig-compatible 2D tachie avatar
+
+![PSD Tachie example app](./packages/core/examples/react-psd-app/images/react-psd-app.webp)
+
+Load a single PSD file at runtime, composite PSD layers on canvas, and drive
+mouth/eye layers with real-time lip-sync and blinking. Supports both
+PSDTool-style leading `!` forced-visible / leading `*` radio layers and
+Anime2.5DRig-compatible layer names for motion mode. A bundled `sample.psd`
+animates with zero setup. See
+[`packages/core/examples/react-psd-app`](./packages/core/examples/react-psd-app).
+
+```bash
+git clone https://github.com/shinshin86/aituber-onair.git
+cd aituber-onair/packages/core/examples/react-psd-app
 npm install
 npm run dev
 ```
@@ -180,6 +251,8 @@ See each package README for provider setup and fuller usage.
   configure providers, and run locally.
 - [Examples](./docs/examples.md): choose from full AI VTuber apps, package
   examples, bot examples, and local runtime examples.
+- [Avatar Guide](./docs/avatar.md): choose avatar styles and expand avatar
+  expressions for richer AI character presentation.
 
 ## Packages
 
@@ -190,7 +263,9 @@ See each package README for provider setup and fuller usage.
 </p>
 
 CLI for creating an AITuber OnAir app from an official starter template.
-Currently includes PNGTuber and VRM templates with bundled starter assets.
+Includes PNGTuber, VRM, Live2D, Pet, PuruPuru, PSD, and Inochi2D templates.
+Live2D does not bundle licensed model assets, and Inochi2D offers its large Aka
+sample model as an optional integrity-checked download.
 ```bash
 npm create aituber-onair@latest
 ```
@@ -309,7 +384,15 @@ aituber-onair/
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+The software and documentation are licensed under the MIT License — see
+[LICENSE](./LICENSE).
+
+Bundled Miko avatar images, models, spritesheets, and packages are not covered
+by the MIT License. They are governed by the authoritative Japanese
+[Miko Character Usage Guidelines](https://miko.aituberonair.com/#terms); see
+[Miko Asset Terms](./MIKO_ASSET_TERMS.md) for a short English summary. The assets may be distributed as an integral part of software, apps,
+games, videos, websites, and other works or content, including third-party
+projects. Standalone redistribution and asset collections are prohibited.
 
 ## Special Thanks
 
@@ -333,7 +416,11 @@ npm run fmt
 ### Agent Skills
 
 Shared Agent Skills so Codex and Claude Code use the same workflow definitions.
-See [`docs/agent-skills.md`](./docs/agent-skills.md) for the full guide. Canonical sources live in `skills/`, with Claude Code runtime copies under `.claude/skills/`.
+See [`docs/agent-skills.md`](./docs/agent-skills.md) for the full guide,
+including a
+[copy-paste Google Colab local LLM request](./docs/agent-skills.md#google-colab-local-llm-quick-start).
+Canonical sources live in `skills/`, with Claude Code runtime copies under
+`.claude/skills/`.
 
 ### Releases
 

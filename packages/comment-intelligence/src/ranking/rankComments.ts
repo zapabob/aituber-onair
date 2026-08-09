@@ -1,21 +1,26 @@
-import type { LiveComment } from '../types/comment';
-import type { CommentIntelligenceConfig } from '../types/config';
-import type { StreamState } from '../types/context';
-import type { RankedComment } from '../types/ranking';
-import type { SafetyReport } from '../types/safety';
-import type { ViewerProfile, ViewerSafetyState } from '../types/viewer';
-import { normalizeText } from '../utils/text';
-import { scoreComment } from './scoring';
-import { defaultRankingWeights, getStrategyWeights } from './strategies';
+import type { LiveComment } from '../types/comment.js';
+import type { CommentIntelligenceConfig } from '../types/config.js';
+import type { StreamState } from '../types/context.js';
+import type { AnsweredState } from '../types/answered.js';
+import type { RankedComment } from '../types/ranking.js';
+import type { SafetyReport } from '../types/safety.js';
+import type { ViewerProfile, ViewerSafetyState } from '../types/viewer.js';
+import { normalizeText } from '../utils/text.js';
+import { scoreComment } from './scoring.js';
+import { defaultRankingWeights, getStrategyWeights } from './strategies.js';
 
 export type RankCommentsInput = {
   comments: LiveComment[];
   safetyReports: SafetyReport[];
   viewerProfiles?: ViewerProfile[];
   viewerSafetyStates?: ViewerSafetyState[];
+  answeredStates?: AnsweredState[];
+  answeredViewerIds?: string[];
   streamState?: StreamState;
   config?: NonNullable<CommentIntelligenceConfig['ranking']>;
 };
+
+const ANSWERED_COMMENT_PENALTY = 0.75;
 
 export function rankComments(_input: RankCommentsInput): {
   rankedComments: RankedComment[];
@@ -24,9 +29,11 @@ export function rankComments(_input: RankCommentsInput): {
   const input = _input;
   const config = input.config ?? {};
   const strategy = config.strategy ?? 'balanced';
+  const topicFilter = config.topicFilter ?? 'prefer';
   const weights = {
     ...getStrategyWeights(strategy),
     ...config.weights,
+    ...(topicFilter === 'off' ? { topicRelevance: 0 } : {}),
   };
   const safetyById = new Map(
     input.safetyReports.map((report) => [report.commentId, report])
@@ -42,6 +49,23 @@ export function rankComments(_input: RankCommentsInput): {
       )
       .map((state) => state.viewerId)
   );
+  const answeredMemory = config.answeredMemory ?? {};
+  const answerMemoryEnabled = answeredMemory.enabled !== false;
+  const answeredCommentIds = new Set(
+    answerMemoryEnabled
+      ? (input.answeredStates ?? []).map((state) => state.commentId)
+      : []
+  );
+  const answeredViewerIds = new Set(
+    answerMemoryEnabled ? (input.answeredViewerIds ?? []) : []
+  );
+  if (answerMemoryEnabled && answeredMemory.dedupeByViewer) {
+    for (const state of input.answeredStates ?? []) {
+      if (state.authorId) {
+        answeredViewerIds.add(state.authorId);
+      }
+    }
+  }
   const seenTexts = new Map<string, number>();
   const freshestTimestamp = Math.max(
     0,
@@ -65,6 +89,9 @@ export function rankComments(_input: RankCommentsInput): {
         safetyPenaltyMultiplier,
       });
       const isBlockedViewer = blockedViewerIds.has(comment.author.id);
+      const isAnswered =
+        answeredCommentIds.has(comment.id) ||
+        answeredViewerIds.has(comment.author.id);
       const safetyReport =
         safetyById.get(comment.id) ??
         (isBlockedViewer
@@ -76,14 +103,35 @@ export function rankComments(_input: RankCommentsInput): {
               reason: 'viewer is blocked due to previous unsafe comments',
             }
           : undefined);
-      const reasons = isBlockedViewer
-        ? [...scored.reasons, 'blocked_viewer' as const, 'unsafe' as const]
+      const baseReasons = isAnswered
+        ? [
+            ...scored.reasons.filter((reason) => reason !== 'fresh'),
+            'ignored_recently' as const,
+          ]
         : scored.reasons;
+      const reasons = isBlockedViewer
+        ? [...baseReasons, 'blocked_viewer' as const, 'unsafe' as const]
+        : baseReasons;
+      const scoreBreakdown = isAnswered
+        ? {
+            ...scored.scoreBreakdown,
+            novelty: 0,
+            freshness: 0,
+            penalty: scored.scoreBreakdown.penalty + ANSWERED_COMMENT_PENALTY,
+          }
+        : scored.scoreBreakdown;
+      const answeredScoreAdjustment = isAnswered
+        ? scored.scoreBreakdown.novelty * weights.novelty +
+          scored.scoreBreakdown.freshness * weights.freshness +
+          ANSWERED_COMMENT_PENALTY
+        : 0;
 
       return {
         ...comment,
-        score: isBlockedViewer ? scored.score - 2 : scored.score,
-        scoreBreakdown: scored.scoreBreakdown,
+        score:
+          (isBlockedViewer ? scored.score - 2 : scored.score) -
+          answeredScoreAdjustment,
+        scoreBreakdown,
         reasons,
         safetyReport,
       };
@@ -92,9 +140,19 @@ export function rankComments(_input: RankCommentsInput): {
 
   const maxSelectedComments = config.maxSelectedComments ?? 1;
   const minScore = config.minScore ?? 0.3;
+  const requiresTopic =
+    topicFilter === 'require' && Boolean(input.streamState?.topic?.trim());
   const selectedComments = rankedComments
     .filter((comment) => !comment.safetyReport?.shouldIgnore)
+    .filter(
+      (comment) =>
+        answeredMemory.mode !== 'exclude' ||
+        !comment.reasons.includes('ignored_recently')
+    )
     .filter((comment) => comment.score >= minScore)
+    .filter(
+      (comment) => !requiresTopic || comment.reasons.includes('topic_related')
+    )
     .slice(0, maxSelectedComments);
 
   return {

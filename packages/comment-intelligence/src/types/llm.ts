@@ -1,8 +1,9 @@
-import type { LiveComment } from './comment';
-import type { RecentAiMessage, StreamState } from './context';
+import type { LiveComment } from './comment.js';
+import type { RecentAiMessage, StreamState } from './context.js';
 
 export type LLMCommentAnalysisResult = {
   selectedCommentIds?: string[];
+  topicRelatedCommentIds?: string[];
   ignoredSummary?: string;
   audienceMood?: 'calm' | 'excited' | 'confused' | 'negative';
   safetyFlags?: Array<{

@@ -11,16 +11,16 @@ This example application serves as a practical implementation guide for integrat
 ### Key Features
 
 - **🤖 Multi-Provider LLM Support**
-  - OpenAI (GPT-4.1, GPT-4o, GPT-5 series including GPT-5.5 and GPT-5.4/5.4 Mini/5.4 Nano/5.4 Pro)
+  - OpenAI (GPT-4.1, GPT-4o, GPT-5 series including GPT-5.6 Sol/Terra/Luna, GPT-5.5, and GPT-5.4 variants)
   - Gemini Nano (Chrome Built-in AI, no API key)
   - OpenAI-Compatible (local/self-hosted Chat Completions endpoints)
-  - Google Gemini (Gemini 3.5 Flash, Gemini 3.1 Flash-Lite, Gemma 4, Pro, Flash, Thinking models)
-  - Anthropic Claude (4.8 Opus, 4.7 Opus, 4.6 Sonnet/Opus, 4.5 Opus/Sonnet/Haiku, 4.x, 3.x families)
-  - DeepSeek and Mistral first-class providers
+  - Google Gemini (Gemini 3.6 Flash, Gemini 3.5 Flash / Flash-Lite, Gemini 3.1 Flash-Lite, Gemma 4, Pro, Flash, Thinking models)
+  - Anthropic Claude (Opus 5, Sonnet 5, 4.8 Opus, 4.7 Opus, 4.6 Sonnet/Opus, 4.5 Opus/Sonnet/Haiku, 4.x, 3.x families)
+  - DeepSeek, Mistral, Sakana AI (disabled in browser UI), and PLaMo first-class providers
   - Seamless provider switching
 
 - **🎙️ Comprehensive Voice Synthesis**
-  - 13 different TTS engines with unique capabilities
+  - 15 different TTS engines with unique capabilities
   - Real-time voice streaming
   - Speaker selection for each engine
   - Emotion-aware synthesis support
@@ -94,7 +94,7 @@ npm run fmt      # Format code with Biome
 
 Click the "設定" (Settings) button to configure your AI provider:
 
-1. **Select Provider**: Choose from OpenAI, Gemini, Gemini Nano, Claude, Z.ai, Kimi, xAI, DeepSeek, Mistral, OpenRouter, or OpenAI-Compatible
+1. **Select Provider**: Choose from OpenAI, Gemini, Gemini Nano, Claude, Z.ai, Kimi, xAI, DeepSeek, Mistral, PLaMo, OpenRouter, or OpenAI-Compatible. Sakana AI is shown as disabled for browser-only usage.
 2. **Enter API Key**: Provide your provider's API key (`openai-compatible` and `gemini-nano` can work without one)
 3. **Choose Model**: Select the specific model to use
 4. **System Prompt**: Customize the AI's behavior and personality
@@ -117,10 +117,12 @@ Click the "設定" (Settings) button to configure your AI provider:
 
 **Gemini:**
 - Gemma 4 series (31B IT, 26B A4B IT)
-- Gemini 3.5 Flash with automatic minimal thinking for chat-style responses
+- Gemini 3.6 Flash and Gemini 3.5 Flash / Flash-Lite
 - Gemini 3 series (3.1 Flash-Lite, 3.1 Pro Preview, 3 Flash Preview, plus deprecated preview aliases)
 - Gemini 2.5 series (Flash Lite, Flash, Pro)
 - Gemini 2.5 Flash Lite Preview (06-17)
+- Gemini 3 Flash-family models expose `reasoning_effort`; Flash defaults to `minimal`, while Pro defaults to `low`
+- Gemini 2.5 keeps using `thinkingBudget` and does not expose this control
 
 **Gemini Nano:**
 - Built-in Chrome `gemini-nano` model
@@ -128,6 +130,7 @@ Click the "設定" (Settings) button to configure your AI provider:
 - Requires Chrome 138+ with `#optimization-guide-on-device-model` and `#prompt-api-for-gemini-nano` enabled
 
 **Claude:**
+- Claude Opus 5 and Claude Sonnet 5
 - Claude Opus 4.8
 - Claude Opus 4.7
 - Claude 4.6 Opus
@@ -135,33 +138,64 @@ Click the "設定" (Settings) button to configure your AI provider:
 - Claude 4.5 series (Opus, Sonnet, Haiku)
 - Claude 4 series (Sonnet, Opus, deprecated but still available)
 - Claude 3 Haiku (deprecated but still available)
+- Supported models expose `reasoning_effort`, mapped to Claude
+  `output_config.effort`; the API default is `high`
 
 **Z.ai:**
+- GLM-5.2
+- GLM-5.1
+- GLM-5V-Turbo (vision)
 - GLM-5 and GLM-5-Turbo (text-only)
 - GLM-4.7 series
 - GLM-4.6 and GLM-4.6V series
 
 **Kimi:**
+- Kimi K3 with vision and configurable `reasoning_effort` (`low`, `high`, or `max`; defaults to `max` and cannot be disabled)
+- Kimi K2.7 Code
+- Kimi K2.7 Code HighSpeed
 - Kimi K2.6
 - Kimi K2.5
 
 **xAI:**
-- Grok 4.3
+- Grok 4.5 and Grok 4.3
 - Grok 4.20 series
 - Grok 4.1 Fast series
+- Grok 4.5 exposes `reasoning_effort` and defaults to `low`; Grok 4.3 defaults to `none` for lower latency
 
 **DeepSeek:**
-- DeepSeek V4 Flash
-- DeepSeek V4 Pro
+- DeepSeek V4 Flash and DeepSeek V4 Pro with model-aware reasoning controls
+- Defaults to `none` for responsive chat; higher supported efforts remain selectable
+- Thinking and tool calling cannot currently be combined in one request
 
 **Mistral:**
+- Ministral 3 (3B, 8B, and 14B; vision-capable)
 - Mistral Small Latest
 - Mistral Medium 3.5
 - Mistral Large Latest / 3, Small 4, Medium 3.1
 
+**Sakana AI:**
+- Fugu
+- Fugu Ultra / Fugu Ultra 20260615
+- Shown as disabled in this browser example because direct browser requests can fail with CORS
+
+**PLaMo:**
+- PLaMo 3.0 Prime
+- PLaMo 2.2 Prime
+
 **OpenRouter:**
-- Curated multi-provider models (OpenRouter Auto/Fusion, OpenAI/Claude/Gemini latest aliases, OpenAI GPT-5.5, Z.ai, Kimi)
+- Curated multi-provider models, including Auto Router Beta, OpenAI GPT-5.6,
+  Claude Opus 5, Gemini 3.6/3.5, Grok 4.5, Kimi K3, KAT-Coder V2.5, and
+  DeepSeek V4 Flash
+- DeepSeek V4 Flash offers the fixed current `deepseek/deepseek-v4-flash-0731`
+  model and the separate `deepseek/deepseek-v4-flash` preview snapshot
+- Reasoning effort options follow the selected model and default to explicit
+  `none` for responsive chat
+- `responseLength`-derived token limits are omitted for Auto Router and Auto
+  Router Beta; explicitly supplied `maxTokens` values remain effective
 - Fusion bills the combined underlying model calls and any enabled web search/fetch usage
+- GLM-5.2 defaults reasoning effort to `none` and omits automatic `max_tokens`
+- Kimi K3 can return 429 when upstream capacity is constrained; Grok 4.5 has
+  region-specific availability limits
 - `Fetch free models` button to probe currently available `:free` models
 - Dynamic free models are added to the model select list
 - `Max candidates` means "maximum number of `:free` candidates to probe"
@@ -189,7 +223,7 @@ When using GPT-5 models, additional configuration options become available:
 
 #### Custom Settings
 - **Verbosity**: Low, Medium, High
-- **Reasoning Effort**: `none`/`minimal`/`low`/`medium`/`high`/`xhigh` (options change by model capability)
+- **Reasoning Effort**: `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max` (options change by provider and model capability)
 - **Endpoint**: Chat Completions API or Responses API (`gpt-5.4-pro` is fixed to Responses API)
 
 `gpt-5.5-pro` is not listed because OpenAI documents it as non-streaming,
@@ -199,7 +233,7 @@ while this example uses the standard streaming chat flow.
 
 ### Supported TTS Engines
 
-The application supports 13 different Text-to-Speech engines:
+The application supports 15 different Text-to-Speech engines:
 
 #### 1. **OpenAI TTS**
 - Requires OpenAI API key
@@ -280,6 +314,11 @@ The application supports 13 different Text-to-Speech engines:
 - No API key required
 - Requires `public/piper/` assets
 - Supports speed and noise scale
+
+#### 15. **Web Speech API**
+- Browser-native speech synthesis with no API key
+- Loads the browser's available voices and supports language, rate, pitch, and volume
+- Plays directly through the browser, so audio-buffer-based lip sync is not supported
 
 ### Speech Chunking Settings
 

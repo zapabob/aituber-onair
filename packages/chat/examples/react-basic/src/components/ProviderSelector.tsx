@@ -6,14 +6,28 @@ import {
   type GPT5PresetKey,
   type VisionSupportLevel,
   allowsReasoningLow,
+  allowsReasoningMax,
   allowsReasoningMinimal,
   allowsReasoningNone,
   allowsReasoningXHigh,
+  getClaudeSupportedReasoningEfforts,
   getDefaultReasoningEffortForGPT5Model,
+  getDefaultXaiReasoningEffort,
+  getGeminiSupportedReasoningEfforts,
+  getDeepSeekSupportedReasoningEfforts,
+  getOpenRouterSupportedReasoningEfforts,
   isGPT5Model,
+  isXaiReasoningEffortModel,
+  isXaiReasoningEffortNoneModel,
   isResponsesOnlyGPT5Model,
   isOpenRouterFreeModel,
   refreshOpenRouterFreeModels,
+  normalizeClaudeReasoningEffort,
+  normalizeGeminiReasoningEffort,
+  type ClaudeReasoningEffort,
+  type GeminiReasoningEffort,
+  type DeepSeekReasoningEffort,
+  type OpenRouterReasoningEffort,
   // OpenAI models
   MODEL_GPT_5_NANO,
   MODEL_GPT_5_MINI,
@@ -21,6 +35,10 @@ import {
   MODEL_GPT_5_1,
   MODEL_GPT_5_4,
   MODEL_GPT_5_5,
+  MODEL_GPT_5_6,
+  MODEL_GPT_5_6_SOL,
+  MODEL_GPT_5_6_TERRA,
+  MODEL_GPT_5_6_LUNA,
   MODEL_GPT_5_4_MINI,
   MODEL_GPT_5_4_NANO,
   MODEL_GPT_5_4_PRO,
@@ -42,11 +60,15 @@ import {
   MODEL_CLAUDE_4_6_OPUS,
   MODEL_CLAUDE_4_7_OPUS,
   MODEL_CLAUDE_4_8_OPUS,
+  MODEL_CLAUDE_5_SONNET,
+  MODEL_CLAUDE_5_OPUS,
   MODEL_CLAUDE_3_HAIKU,
   // Gemini models
   MODEL_GEMMA_4_31B_IT,
   MODEL_GEMMA_4_26B_A4B_IT,
+  MODEL_GEMINI_3_6_FLASH,
   MODEL_GEMINI_3_5_FLASH,
+  MODEL_GEMINI_3_5_FLASH_LITE,
   MODEL_GEMINI_3_1_PRO_PREVIEW,
   MODEL_GEMINI_3_1_FLASH_LITE,
   MODEL_GEMINI_3_1_FLASH_LITE_PREVIEW,
@@ -57,13 +79,25 @@ import {
   MODEL_GEMINI_2_5_FLASH_LITE,
   MODEL_GEMINI_2_5_FLASH_LITE_PREVIEW_06_17,
   // OpenRouter models
+  MODEL_ANTHROPIC_CLAUDE_OPUS_5,
   MODEL_GPT_OSS_20B_FREE,
+  MODEL_GOOGLE_GEMINI_3_5_FLASH_LITE,
+  MODEL_GOOGLE_GEMINI_3_6_FLASH,
+  MODEL_KWAIPILOT_KAT_CODER_AIR_V2_5,
+  MODEL_KWAIPILOT_KAT_CODER_PRO_V2_5,
+  MODEL_MOONSHOTAI_KIMI_K3,
   MODEL_MOONSHOTAI_KIMI_K2_5,
   MODEL_MOONSHOTAI_KIMI_LATEST,
   MODEL_OPENROUTER_AUTO,
+  MODEL_OPENROUTER_AUTO_BETA,
   MODEL_OPENROUTER_FUSION,
+  MODEL_OPENROUTER_DEEPSEEK_V4_FLASH,
+  MODEL_OPENROUTER_DEEPSEEK_V4_FLASH_0731,
   MODEL_OPENAI_GPT_LATEST,
   MODEL_OPENAI_GPT_MINI_LATEST,
+  MODEL_OPENAI_GPT_5_6_SOL,
+  MODEL_OPENAI_GPT_5_6_TERRA,
+  MODEL_OPENAI_GPT_5_6_LUNA,
   MODEL_OPENAI_GPT_5_5_PRO,
   MODEL_OPENAI_GPT_5_5,
   MODEL_OPENAI_GPT_5_1_CHAT,
@@ -85,12 +119,19 @@ import {
   MODEL_GOOGLE_GEMINI_2_5_PRO,
   MODEL_GOOGLE_GEMINI_2_5_FLASH,
   MODEL_GOOGLE_GEMINI_2_5_FLASH_LITE_PREVIEW_09_2025,
+  MODEL_ZAI_GLM_5_2,
   MODEL_ZAI_GLM_4_7_FLASH,
   MODEL_ZAI_GLM_4_5_AIR,
   MODEL_ZAI_GLM_4_5_AIR_FREE,
+  MODEL_MOONSHOTAI_KIMI_K2_7_CODE,
+  MODEL_XAI_GROK_4_5,
+  MODEL_XAI_GROK_LATEST,
   // Z.ai models
+  MODEL_GLM_5_2,
+  MODEL_GLM_5_1,
   MODEL_GLM_5,
   MODEL_GLM_5_TURBO,
+  MODEL_GLM_5V_TURBO,
   MODEL_GLM_4_7,
   MODEL_GLM_4_7_FLASHX,
   MODEL_GLM_4_7_FLASH,
@@ -99,26 +140,41 @@ import {
   MODEL_GLM_4_6V_FLASHX,
   MODEL_GLM_4_6V_FLASH,
   // xAI models
+  MODEL_GROK_4_5,
   MODEL_GROK_4_3,
   MODEL_GROK_4_20_REASONING,
   MODEL_GROK_4_20_NON_REASONING,
   MODEL_GROK_4_1_FAST_REASONING,
   MODEL_GROK_4_1_FAST_NON_REASONING,
   // Kimi models
+  MODEL_KIMI_K3,
   MODEL_KIMI_K2_6,
+  MODEL_KIMI_K2_7_CODE,
+  MODEL_KIMI_K2_7_CODE_HIGHSPEED,
   MODEL_KIMI_K2_5,
   // DeepSeek models
   MODEL_DEEPSEEK_V4_FLASH,
   MODEL_DEEPSEEK_V4_PRO,
   // Mistral models
+  MODEL_MINISTRAL_3B_2512,
+  MODEL_MINISTRAL_8B_2512,
+  MODEL_MINISTRAL_14B_2512,
   MODEL_MISTRAL_SMALL_LATEST,
   MODEL_MISTRAL_MEDIUM_3_5,
   MODEL_MISTRAL_LARGE_LATEST,
   MODEL_MISTRAL_LARGE_2512,
   MODEL_MISTRAL_SMALL_2603,
   MODEL_MISTRAL_MEDIUM_2508,
+  // Sakana models
+  MODEL_FUGU,
+  MODEL_FUGU_ULTRA,
+  MODEL_FUGU_ULTRA_20260615,
+  // PLaMo models
+  MODEL_PLAMO_3_0_PRIME,
+  MODEL_PLAMO_2_2_PRIME,
   // Gemini Nano models
   MODEL_GEMINI_NANO,
+  isKimiReasoningEffortModel,
 } from '@aituber-onair/chat';
 
 interface ProviderSelectorProps {
@@ -132,9 +188,16 @@ interface ProviderSelectorProps {
   onModelChange: (model: string) => void;
   gpt5Preset?: GPT5PresetKey;
   onGpt5PresetChange?: (preset: GPT5PresetKey | undefined) => void;
-  reasoning_effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  reasoning_effort?:
+    | 'none'
+    | 'minimal'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'xhigh'
+    | 'max';
   onReasoningEffortChange?: (
-    effort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh',
+    effort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max',
   ) => void;
   verbosity?: 'low' | 'medium' | 'high';
   onVerbosityChange?: (verbosity: 'low' | 'medium' | 'high') => void;
@@ -146,9 +209,9 @@ interface ProviderSelectorProps {
   onOpenaiCompatibleEndpointChange?: (endpoint: string) => void;
   enableReasoningSummary?: boolean;
   onEnableReasoningSummaryChange?: (enabled: boolean) => void;
-  openrouterReasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+  openrouterReasoningEffort?: OpenRouterReasoningEffort;
   onOpenrouterReasoningEffortChange?: (
-    effort: 'none' | 'minimal' | 'low' | 'medium' | 'high',
+    effort: OpenRouterReasoningEffort,
   ) => void;
   openrouterIncludeReasoning?: boolean;
   onOpenrouterIncludeReasoningChange?: (enabled: boolean) => void;
@@ -192,6 +255,13 @@ type DynamicOpenRouterFreeModel = ProviderModel & {
   provider: 'openrouter';
   default: false;
   dynamic: true;
+};
+
+type ProviderInfo = {
+  name: string;
+  placeholder: string;
+  disabled?: boolean;
+  disabledReason?: string;
 };
 
 const EXAMPLE_STORAGE_ROOT_KEY = 'AITuberOnAirChat_example_react-basic';
@@ -353,7 +423,7 @@ const saveDynamicOpenRouterFreeModels = (
   localStorage.setItem(EXAMPLE_STORAGE_ROOT_KEY, JSON.stringify(rootObject));
 };
 
-const providerInfo = {
+const providerInfo: Record<Provider, ProviderInfo> = {
   openai: {
     name: 'OpenAI',
     placeholder: 'sk-...',
@@ -393,6 +463,17 @@ const providerInfo = {
   mistral: {
     name: 'Mistral',
     placeholder: 'xxx...',
+  },
+  sakana: {
+    name: 'Sakana AI',
+    placeholder: 'xxx...',
+    disabled: true,
+    disabledReason:
+      'Disabled: browser CORS unsupported. Use Node.js or a backend proxy.',
+  },
+  plamo: {
+    name: 'PLaMo',
+    placeholder: 'plamo-...',
   },
   'gemini-nano': {
     name: 'Gemini Nano (Browser AI)',
@@ -435,6 +516,30 @@ export const allModels: ProviderModel[] = [
   {
     id: MODEL_GPT_5_5,
     name: 'GPT-5.5',
+    provider: 'openai',
+    default: false,
+  },
+  {
+    id: MODEL_GPT_5_6,
+    name: 'GPT-5.6 (Sol alias)',
+    provider: 'openai',
+    default: false,
+  },
+  {
+    id: MODEL_GPT_5_6_SOL,
+    name: 'GPT-5.6 Sol',
+    provider: 'openai',
+    default: false,
+  },
+  {
+    id: MODEL_GPT_5_6_TERRA,
+    name: 'GPT-5.6 Terra',
+    provider: 'openai',
+    default: false,
+  },
+  {
+    id: MODEL_GPT_5_6_LUNA,
+    name: 'GPT-5.6 Luna',
     provider: 'openai',
     default: false,
   },
@@ -507,6 +612,18 @@ export const allModels: ProviderModel[] = [
 
   // Claude models
   {
+    id: MODEL_CLAUDE_5_OPUS,
+    name: 'Claude Opus 5',
+    provider: 'claude',
+    default: false,
+  },
+  {
+    id: MODEL_CLAUDE_5_SONNET,
+    name: 'Claude Sonnet 5',
+    provider: 'claude',
+    default: false,
+  },
+  {
     id: MODEL_CLAUDE_4_8_OPUS,
     name: 'Claude Opus 4.8',
     provider: 'claude',
@@ -569,8 +686,20 @@ export const allModels: ProviderModel[] = [
 
   // Gemini models
   {
+    id: MODEL_GEMINI_3_6_FLASH,
+    name: 'Gemini 3.6 Flash',
+    provider: 'gemini',
+    default: false,
+  },
+  {
     id: MODEL_GEMINI_3_5_FLASH,
     name: 'Gemini 3.5 Flash',
+    provider: 'gemini',
+    default: false,
+  },
+  {
+    id: MODEL_GEMINI_3_5_FLASH_LITE,
+    name: 'Gemini 3.5 Flash-Lite',
     provider: 'gemini',
     default: false,
   },
@@ -649,8 +778,26 @@ export const allModels: ProviderModel[] = [
     default: false,
   },
   {
+    id: MODEL_OPENROUTER_AUTO_BETA,
+    name: 'Auto Router Beta (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
     id: MODEL_OPENROUTER_FUSION,
     name: 'Fusion (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_OPENROUTER_DEEPSEEK_V4_FLASH_0731,
+    name: 'DeepSeek V4 Flash 0731 (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_OPENROUTER_DEEPSEEK_V4_FLASH,
+    name: 'DeepSeek V4 Flash 0423 (OpenRouter)',
     provider: 'openrouter',
     default: false,
   },
@@ -669,6 +816,24 @@ export const allModels: ProviderModel[] = [
   {
     id: MODEL_OPENAI_GPT_MINI_LATEST,
     name: 'GPT Mini Latest (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_OPENAI_GPT_5_6_SOL,
+    name: 'GPT-5.6 Sol (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_OPENAI_GPT_5_6_TERRA,
+    name: 'GPT-5.6 Terra (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_OPENAI_GPT_5_6_LUNA,
+    name: 'GPT-5.6 Luna (OpenRouter)',
     provider: 'openrouter',
     default: false,
   },
@@ -739,6 +904,12 @@ export const allModels: ProviderModel[] = [
     default: false,
   },
   {
+    id: MODEL_ANTHROPIC_CLAUDE_OPUS_5,
+    name: 'Claude Opus 5 (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
     id: MODEL_ANTHROPIC_CLAUDE_OPUS_4,
     name: 'Claude 4 Opus (OpenRouter)',
     provider: 'openrouter',
@@ -781,6 +952,18 @@ export const allModels: ProviderModel[] = [
     default: false,
   },
   {
+    id: MODEL_GOOGLE_GEMINI_3_6_FLASH,
+    name: 'Gemini 3.6 Flash (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_GOOGLE_GEMINI_3_5_FLASH_LITE,
+    name: 'Gemini 3.5 Flash Lite (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
     id: MODEL_GOOGLE_GEMINI_2_5_PRO,
     name: 'Gemini 2.5 Pro (OpenRouter)',
     provider: 'openrouter',
@@ -795,6 +978,12 @@ export const allModels: ProviderModel[] = [
   {
     id: MODEL_GOOGLE_GEMINI_2_5_FLASH_LITE_PREVIEW_09_2025,
     name: 'Gemini 2.5 Flash Lite Preview (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_ZAI_GLM_5_2,
+    name: 'GLM-5.2 (OpenRouter)',
     provider: 'openrouter',
     default: false,
   },
@@ -817,8 +1006,32 @@ export const allModels: ProviderModel[] = [
     default: false,
   },
   {
+    id: MODEL_XAI_GROK_LATEST,
+    name: 'Grok Latest (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_XAI_GROK_4_5,
+    name: 'Grok 4.5 (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
     id: MODEL_MOONSHOTAI_KIMI_LATEST,
     name: 'Kimi Latest (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_MOONSHOTAI_KIMI_K3,
+    name: 'Kimi K3 (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_MOONSHOTAI_KIMI_K2_7_CODE,
+    name: 'Kimi K2.7 Code (OpenRouter)',
     provider: 'openrouter',
     default: false,
   },
@@ -828,8 +1041,32 @@ export const allModels: ProviderModel[] = [
     provider: 'openrouter',
     default: false,
   },
+  {
+    id: MODEL_KWAIPILOT_KAT_CODER_AIR_V2_5,
+    name: 'KAT-Coder-Air V2.5 (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
+  {
+    id: MODEL_KWAIPILOT_KAT_CODER_PRO_V2_5,
+    name: 'KAT-Coder-Pro V2.5 (OpenRouter)',
+    provider: 'openrouter',
+    default: false,
+  },
 
   // Z.ai models
+  {
+    id: MODEL_GLM_5_2,
+    name: 'GLM-5.2',
+    provider: 'zai',
+    default: true,
+  },
+  {
+    id: MODEL_GLM_5_1,
+    name: 'GLM-5.1',
+    provider: 'zai',
+    default: false,
+  },
   {
     id: MODEL_GLM_5,
     name: 'GLM-5',
@@ -843,10 +1080,16 @@ export const allModels: ProviderModel[] = [
     default: false,
   },
   {
+    id: MODEL_GLM_5V_TURBO,
+    name: 'GLM-5V-Turbo',
+    provider: 'zai',
+    default: false,
+  },
+  {
     id: MODEL_GLM_4_7,
     name: 'GLM-4.7',
     provider: 'zai',
-    default: true,
+    default: false,
   },
   {
     id: MODEL_GLM_4_7_FLASHX,
@@ -887,6 +1130,12 @@ export const allModels: ProviderModel[] = [
 
   // xAI models
   {
+    id: MODEL_GROK_4_5,
+    name: 'Grok 4.5',
+    provider: 'xai',
+    default: false,
+  },
+  {
     id: MODEL_GROK_4_3,
     name: 'Grok 4.3',
     provider: 'xai',
@@ -918,6 +1167,24 @@ export const allModels: ProviderModel[] = [
   },
 
   // Kimi models
+  {
+    id: MODEL_KIMI_K3,
+    name: 'Kimi K3',
+    provider: 'kimi',
+    default: false,
+  },
+  {
+    id: MODEL_KIMI_K2_7_CODE,
+    name: 'Kimi K2.7 Code',
+    provider: 'kimi',
+    default: false,
+  },
+  {
+    id: MODEL_KIMI_K2_7_CODE_HIGHSPEED,
+    name: 'Kimi K2.7 Code HighSpeed',
+    provider: 'kimi',
+    default: false,
+  },
   {
     id: MODEL_KIMI_K2_6,
     name: 'Kimi K2.6',
@@ -953,6 +1220,24 @@ export const allModels: ProviderModel[] = [
     default: true,
   },
   {
+    id: MODEL_MINISTRAL_3B_2512,
+    name: 'Ministral 3 3B',
+    provider: 'mistral',
+    default: false,
+  },
+  {
+    id: MODEL_MINISTRAL_8B_2512,
+    name: 'Ministral 3 8B',
+    provider: 'mistral',
+    default: false,
+  },
+  {
+    id: MODEL_MINISTRAL_14B_2512,
+    name: 'Ministral 3 14B',
+    provider: 'mistral',
+    default: false,
+  },
+  {
     id: MODEL_MISTRAL_MEDIUM_3_5,
     name: 'Mistral Medium 3.5',
     provider: 'mistral',
@@ -980,6 +1265,40 @@ export const allModels: ProviderModel[] = [
     id: MODEL_MISTRAL_MEDIUM_2508,
     name: 'Mistral Medium 3.1',
     provider: 'mistral',
+    default: false,
+  },
+
+  // Sakana models (kept for source-level parity; provider is disabled in browser UI)
+  {
+    id: MODEL_FUGU,
+    name: 'Fugu',
+    provider: 'sakana',
+    default: true,
+  },
+  {
+    id: MODEL_FUGU_ULTRA,
+    name: 'Fugu Ultra',
+    provider: 'sakana',
+    default: false,
+  },
+  {
+    id: MODEL_FUGU_ULTRA_20260615,
+    name: 'Fugu Ultra 20260615',
+    provider: 'sakana',
+    default: false,
+  },
+
+  // PLaMo models
+  {
+    id: MODEL_PLAMO_3_0_PRIME,
+    name: 'PLaMo 3.0 Prime',
+    provider: 'plamo',
+    default: true,
+  },
+  {
+    id: MODEL_PLAMO_2_2_PRIME,
+    name: 'PLaMo 2.2 Prime',
+    provider: 'plamo',
     default: false,
   },
 
@@ -1091,6 +1410,62 @@ export default function ProviderSelector({
   const allowsLow = provider === 'openai' && allowsReasoningLow(selectedModel);
   const allowsXHigh =
     provider === 'openai' && allowsReasoningXHigh(selectedModel);
+  const allowsMax = provider === 'openai' && allowsReasoningMax(selectedModel);
+  const isXaiReasoningModel =
+    provider === 'xai' && isXaiReasoningEffortModel(selectedModel);
+  const isXaiReasoningNoneModelSelected =
+    provider === 'xai' && isXaiReasoningEffortNoneModel(selectedModel);
+  const isKimiReasoningModel =
+    provider === 'kimi' && isKimiReasoningEffortModel(selectedModel);
+  const claudeSupportedReasoningEfforts =
+    provider === 'claude'
+      ? getClaudeSupportedReasoningEfforts(selectedModel)
+      : [];
+  const isClaudeReasoningModel =
+    provider === 'claude' && claudeSupportedReasoningEfforts.length > 0;
+  const requestedClaudeReasoningEffort: ClaudeReasoningEffort | undefined =
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'medium' ||
+    reasoning_effort === 'high' ||
+    reasoning_effort === 'xhigh' ||
+    reasoning_effort === 'max'
+      ? reasoning_effort
+      : undefined;
+  const claudeReasoningEffort = normalizeClaudeReasoningEffort(
+    selectedModel,
+    requestedClaudeReasoningEffort,
+  );
+  const geminiSupportedReasoningEfforts =
+    provider === 'gemini'
+      ? getGeminiSupportedReasoningEfforts(selectedModel)
+      : [];
+  const isGeminiReasoningModel =
+    provider === 'gemini' && geminiSupportedReasoningEfforts.length > 0;
+  const requestedGeminiReasoningEffort: GeminiReasoningEffort | undefined =
+    reasoning_effort === 'minimal' ||
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'medium' ||
+    reasoning_effort === 'high'
+      ? reasoning_effort
+      : undefined;
+  const geminiReasoningEffort = normalizeGeminiReasoningEffort(
+    selectedModel,
+    requestedGeminiReasoningEffort,
+  );
+  const deepSeekSupportedReasoningEfforts =
+    provider === 'deepseek'
+      ? getDeepSeekSupportedReasoningEfforts(selectedModel)
+      : [];
+  const openRouterSupportedReasoningEfforts =
+    provider === 'openrouter'
+      ? getOpenRouterSupportedReasoningEfforts(selectedModel)
+      : [];
+  const xaiReasoningEffort =
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'medium' ||
+    reasoning_effort === 'high'
+      ? reasoning_effort
+      : (getDefaultXaiReasoningEffort(selectedModel) ?? 'none');
   const baseModelsForProvider = useMemo(
     () => allModels.filter((model) => model.provider === provider),
     [provider],
@@ -1222,6 +1597,9 @@ export default function ProviderSelector({
     if (reasoning_effort === 'xhigh' && !allowsXHigh) {
       return 'high';
     }
+    if (reasoning_effort === 'max' && !allowsMax) {
+      return allowsXHigh ? 'xhigh' : 'high';
+    }
     return reasoning_effort;
   })();
 
@@ -1238,10 +1616,15 @@ export default function ProviderSelector({
                 key={key}
                 className={`provider-item ${provider === key ? 'active' : ''}`}
                 onClick={() => onProviderChange(key as Provider)}
-                disabled={disabled}
+                disabled={disabled || Boolean(value.disabled)}
                 aria-pressed={provider === key}
+                aria-disabled={value.disabled || undefined}
+                title={value.disabledReason}
               >
                 <span className="provider-name">{value.name}</span>
+                {value.disabledReason && (
+                  <span className="provider-meta">{value.disabledReason}</span>
+                )}
               </button>
             ))}
           </div>
@@ -1405,27 +1788,14 @@ export default function ProviderSelector({
                   </summary>
                   <div className="gemini-nano-setup__body">
                     <p>
-                      <strong>Chrome 138+</strong> is required. Enable the
-                      following flags to use Built-in AI:
+                      Web pages require <strong>Chrome 148+</strong> on a
+                      supported desktop device. No Chrome flags are required.
                     </p>
-                    <ol className="gemini-nano-steps">
-                      <li>
-                        Open <code>chrome://flags</code> in the address bar
-                      </li>
-                      <li>
-                        Set <code>#optimization-guide-on-device-model</code> to
-                        &quot;Enabled&quot;
-                      </li>
-                      <li>
-                        Set <code>#prompt-api-for-gemini-nano</code> to
-                        &quot;Enabled&quot;
-                      </li>
-                      <li>Restart Chrome</li>
-                    </ol>
                     <p className="gemini-nano-note">
-                      After enabling the flags, press &quot;Prepare Model&quot;
-                      above to start the model download. The initial download
-                      may take a few minutes.
+                      Press &quot;Prepare Model&quot; above to start the initial
+                      model download. Chrome extensions have supported the
+                      Prompt API since Chrome 138, but normal web pages require
+                      Chrome 148 or later.
                     </p>
                   </div>
                 </details>
@@ -1471,6 +1841,80 @@ export default function ProviderSelector({
                 </span>
               </div>
             </>
+          )}
+
+          {provider === 'gemini' && (
+            <div className="config-group">
+              <label htmlFor="gemini-reasoning-effort">
+                Gemini Reasoning Effort
+              </label>
+              <select
+                id="gemini-reasoning-effort"
+                value={geminiReasoningEffort ?? ''}
+                onChange={(e) =>
+                  onReasoningEffortChange?.(
+                    e.target.value as GeminiReasoningEffort,
+                  )
+                }
+                disabled={disabled || !isGeminiReasoningModel}
+                className="select-input"
+              >
+                {!isGeminiReasoningModel && (
+                  <option value="">Not available</option>
+                )}
+                {geminiSupportedReasoningEfforts.map((effort) => (
+                  <option key={effort} value={effort}>
+                    {effort === 'minimal'
+                      ? 'Minimal (fastest)'
+                      : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                  </option>
+                ))}
+              </select>
+              <span className="helper-text">
+                {isGeminiReasoningModel
+                  ? geminiSupportedReasoningEfforts.includes('minimal')
+                    ? 'Mapped to Gemini thinkingLevel. Minimal is optimized for chat latency.'
+                    : 'Mapped to Gemini thinkingLevel. Low is the lowest level supported by Gemini 3 Pro.'
+                  : 'Gemini 2.5 uses thinkingBudget; other models may not expose configurable thinkingLevel.'}
+              </span>
+            </div>
+          )}
+
+          {provider === 'claude' && (
+            <div className="config-group">
+              <label htmlFor="claude-reasoning-effort">Claude Effort</label>
+              <select
+                id="claude-reasoning-effort"
+                value={claudeReasoningEffort ?? ''}
+                onChange={(e) =>
+                  onReasoningEffortChange?.(
+                    e.target.value as ClaudeReasoningEffort,
+                  )
+                }
+                disabled={disabled || !isClaudeReasoningModel}
+                className="select-input"
+              >
+                {!isClaudeReasoningModel && (
+                  <option value="">Not available</option>
+                )}
+                {claudeSupportedReasoningEfforts.map((effort) => (
+                  <option key={effort} value={effort}>
+                    {effort === 'low'
+                      ? 'Low (fastest)'
+                      : effort === 'high'
+                        ? 'High (API default)'
+                        : effort === 'xhigh'
+                          ? 'XHigh'
+                          : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                  </option>
+                ))}
+              </select>
+              <span className="helper-text">
+                {isClaudeReasoningModel
+                  ? 'Mapped to Claude output_config.effort. Lower effort prioritizes latency and token efficiency.'
+                  : 'The selected Claude model does not expose configurable effort.'}
+              </span>
+            </div>
           )}
 
           {isGPT5 && (
@@ -1565,7 +2009,8 @@ export default function ProviderSelector({
                         | 'low'
                         | 'medium'
                         | 'high'
-                        | 'xhigh',
+                        | 'xhigh'
+                        | 'max',
                     )
                   }
                   disabled={disabled || Boolean(gpt5Preset)}
@@ -1580,6 +2025,7 @@ export default function ProviderSelector({
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                   {allowsXHigh && <option value="xhigh">XHigh</option>}
+                  {allowsMax && <option value="max">Max</option>}
                 </select>
               </div>
 
@@ -1602,6 +2048,69 @@ export default function ProviderSelector({
                 </select>
               </div>
             </>
+          )}
+
+          {provider === 'xai' && (
+            <div className="config-group">
+              <label htmlFor="xai-reasoning-effort">xAI Reasoning Effort</label>
+              <select
+                id="xai-reasoning-effort"
+                value={xaiReasoningEffort}
+                onChange={(e) =>
+                  onReasoningEffortChange?.(
+                    e.target.value as 'none' | 'low' | 'medium' | 'high',
+                  )
+                }
+                disabled={disabled || !isXaiReasoningModel}
+                className="select-input"
+              >
+                {isXaiReasoningNoneModelSelected && (
+                  <option value="none">None (fastest)</option>
+                )}
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+              {!isXaiReasoningModel && (
+                <span className="helper-text">
+                  Available only for Grok 4.5 and Grok 4.3; omitted for other
+                  xAI models.
+                </span>
+              )}
+            </div>
+          )}
+
+          {provider === 'deepseek' && (
+            <div className="config-group">
+              <label htmlFor="deepseek-reasoning-effort">
+                DeepSeek Reasoning Effort
+              </label>
+              <select
+                id="deepseek-reasoning-effort"
+                value={reasoning_effort ?? 'none'}
+                onChange={(e) =>
+                  onReasoningEffortChange?.(
+                    e.target.value as DeepSeekReasoningEffort,
+                  )
+                }
+                disabled={
+                  disabled || deepSeekSupportedReasoningEfforts.length === 0
+                }
+                className="select-input"
+              >
+                {deepSeekSupportedReasoningEfforts.map((effort) => (
+                  <option key={effort} value={effort}>
+                    {effort === 'none'
+                      ? 'None (fastest)'
+                      : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                  </option>
+                ))}
+              </select>
+              <span className="helper-text">
+                None disables thinking for responsive chat. Thinking with tool
+                calling is not supported yet.
+              </span>
+            </div>
           )}
 
           {provider === 'openrouter' && (
@@ -1673,23 +2182,26 @@ export default function ProviderSelector({
                   value={openrouterReasoningEffort || 'none'}
                   onChange={(e) =>
                     onOpenrouterReasoningEffortChange?.(
-                      e.target.value as
-                        | 'none'
-                        | 'minimal'
-                        | 'low'
-                        | 'medium'
-                        | 'high',
+                      e.target.value as OpenRouterReasoningEffort,
                     )
                   }
                   disabled={disabled}
                   className="select-input"
                 >
-                  <option value="none">None</option>
-                  <option value="minimal">Minimal</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  {openRouterSupportedReasoningEfforts.map((effort) => (
+                    <option key={effort} value={effort}>
+                      {effort === 'none'
+                        ? 'None (fastest)'
+                        : effort === 'xhigh'
+                          ? 'XHigh'
+                          : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                    </option>
+                  ))}
                 </select>
+                <span className="helper-text">
+                  Options are filtered for the selected model. None disables
+                  reasoning instead of only hiding it.
+                </span>
               </div>
 
               <div className="config-group">
@@ -1838,23 +2350,56 @@ export default function ProviderSelector({
 
           {provider === 'kimi' && (
             <>
-              <div className="config-group">
-                <label htmlFor="kimi-thinking-type">Thinking</label>
-                <select
-                  id="kimi-thinking-type"
-                  value={kimiThinkingType || 'enabled'}
-                  onChange={(e) =>
-                    onKimiThinkingTypeChange?.(
-                      e.target.value as 'enabled' | 'disabled',
-                    )
-                  }
-                  disabled={disabled}
-                  className="select-input"
-                >
-                  <option value="enabled">Enabled</option>
-                  <option value="disabled">Disabled</option>
-                </select>
-              </div>
+              {isKimiReasoningModel ? (
+                <div className="config-group">
+                  <label htmlFor="kimi-reasoning-effort">
+                    Reasoning Effort
+                  </label>
+                  <select
+                    id="kimi-reasoning-effort"
+                    value={
+                      reasoning_effort === 'low' ||
+                      reasoning_effort === 'high' ||
+                      reasoning_effort === 'max'
+                        ? reasoning_effort
+                        : 'max'
+                    }
+                    onChange={(e) =>
+                      onReasoningEffortChange?.(
+                        e.target.value as 'low' | 'high' | 'max',
+                      )
+                    }
+                    disabled={disabled}
+                    className="select-input"
+                  >
+                    <option value="low">Low</option>
+                    <option value="high">High</option>
+                    <option value="max">Max (default)</option>
+                  </select>
+                  <span className="helper-text">
+                    Kimi K3 always reasons. Use Low for shorter reasoning or Max
+                    for the API default.
+                  </span>
+                </div>
+              ) : (
+                <div className="config-group">
+                  <label htmlFor="kimi-thinking-type">Thinking</label>
+                  <select
+                    id="kimi-thinking-type"
+                    value={kimiThinkingType || 'enabled'}
+                    onChange={(e) =>
+                      onKimiThinkingTypeChange?.(
+                        e.target.value as 'enabled' | 'disabled',
+                      )
+                    }
+                    disabled={disabled}
+                    className="select-input"
+                  >
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </div>
+              )}
 
               <div className="config-group config-full">
                 <label htmlFor="kimi-base-url">Base URL</label>
@@ -1925,7 +2470,7 @@ export default function ProviderSelector({
 
         .provider-list::-webkit-scrollbar-thumb,
         .model-list::-webkit-scrollbar-thumb {
-          background: #bdbdbd;
+          background: var(--border-strong);
           border-radius: 999px;
         }
 
@@ -1942,14 +2487,15 @@ export default function ProviderSelector({
 
         .provider-item:hover:not(:disabled),
         .model-item:hover:not(:disabled) {
-          background: #f1f1f1;
+          border-color: var(--brand);
+          background: var(--brand-tint);
           transform: translateY(-1px);
         }
 
         .provider-item.active,
         .model-item.active {
-          border-color: #0f0f0f;
-          background: #0f0f0f;
+          border-color: var(--brand-strong);
+          background: var(--brand-strong);
           color: white;
         }
 
@@ -1960,6 +2506,10 @@ export default function ProviderSelector({
           transform: none;
         }
 
+        .provider-item:disabled .provider-meta {
+          opacity: 1;
+        }
+
         .model-item {
           display: flex;
           flex-direction: column;
@@ -1968,6 +2518,14 @@ export default function ProviderSelector({
 
         .model-name {
           font-weight: 600;
+        }
+
+        .provider-meta {
+          display: block;
+          margin-top: 0.35rem;
+          font-size: 0.72rem;
+          line-height: 1.35;
+          color: var(--muted);
         }
 
         .model-meta {
@@ -2014,7 +2572,7 @@ export default function ProviderSelector({
           border: 1px solid var(--border);
           border-radius: 999px;
           padding: 0.2rem 0.6rem;
-          background: #fafafa;
+          background: var(--surface-soft);
         }
 
         .settings-panel[open] .summary-action::after {
@@ -2072,7 +2630,7 @@ export default function ProviderSelector({
         }
 
         .small-input:disabled {
-          background: #f1f1f1;
+          background: var(--brand-soft);
           color: #9a9a9a;
           cursor: not-allowed;
         }
@@ -2089,7 +2647,7 @@ export default function ProviderSelector({
         }
 
         .action-button:hover:not(:disabled) {
-          background: #fff;
+          background: var(--brand-tint);
           border-color: var(--input-focus);
           transform: translateY(-1px);
         }
@@ -2138,7 +2696,7 @@ export default function ProviderSelector({
         .text-input:disabled,
         .select-input:disabled,
         .text-area:disabled {
-          background: #f1f1f1;
+          background: var(--brand-soft);
           color: #9a9a9a;
           cursor: not-allowed;
         }

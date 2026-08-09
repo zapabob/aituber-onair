@@ -1,3 +1,10 @@
+import type { XaiReasoningEffort } from '@aituber-onair/core';
+import type { EmotionEffectAnchor } from '../lib/emotionEffectAnchor';
+import type {
+  VrmEmotionEffectMap,
+  VrmReactionControlMode,
+} from '../lib/vrmReactions';
+
 export type ChatProviderOption =
   | 'openai'
   | 'openai-compatible'
@@ -9,7 +16,9 @@ export type ChatProviderOption =
   | 'kimi'
   | 'xai'
   | 'deepseek'
-  | 'mistral';
+  | 'mistral'
+  | 'sakana'
+  | 'plamo';
 export type TTSEngineOption =
   | 'openai'
   | 'geminiTts'
@@ -25,6 +34,7 @@ export type TTSEngineOption =
   | 'inworld'
   | 'gradium'
   | 'piperPlus'
+  | 'webSpeech'
   | 'none';
 export type StreamingPlatformOption = 'none' | 'youtube' | 'twitch';
 
@@ -39,12 +49,16 @@ export interface ProviderApiKeys {
   xai?: string;
   deepseek?: string;
   mistral?: string;
+  sakana?: string;
+  plamo?: string;
 }
 
 export interface LLMSettings {
   provider: ChatProviderOption;
   model: string;
+  systemPrompt: string;
   endpoint?: string;
+  xaiReasoningEffort?: XaiReasoningEffort;
   apiKeys: ProviderApiKeys;
   openRouterDynamicFreeModels?: {
     models: string[];
@@ -118,6 +132,10 @@ export interface TTSSettings {
   piperPlusVoiceFile?: string;
   piperPlusSpeed?: string;
   piperPlusNoiseScale?: string;
+  webSpeechRate?: string;
+  webSpeechPitch?: string;
+  webSpeechVolume?: string;
+  webSpeechLanguage?: string;
 }
 
 export interface StreamSettings {
@@ -137,6 +155,9 @@ export interface CommentIntelligenceSettings {
   enabled: boolean;
   mode: 'rules' | 'hybrid' | 'llm-assisted';
   useSameLLMSettings: boolean;
+  streamTopic: string;
+  streamTitle: string;
+  topicFilter: 'off' | 'prefer' | 'require';
   maxCommentsPerBatch: number;
   analysisIntervalMs: number;
   minCommentsForLLMAnalysis: number;
@@ -152,9 +173,27 @@ export interface ManneriSettings {
   minMessageLength: number;
 }
 
+export interface VisualSettings {
+  backgroundMode: 'default' | 'green';
+  layoutMode: 'chat' | 'broadcast';
+  showInputInBroadcast: boolean;
+  vrmEmotionEffectAnchors: Record<string, EmotionEffectAnchor>;
+  vrmReactionControlMode: VrmReactionControlMode;
+  vrmEmotionEffectMap: VrmEmotionEffectMap;
+}
+
+export interface ScreenVisionSettings {
+  deviceId: string;
+  prompt: string;
+  autoIntervalMs: number;
+  enabled: boolean;
+}
+
 export interface AppSettings {
   llm: LLMSettings;
   tts: TTSSettings;
+  visual: VisualSettings;
+  screenVision: ScreenVisionSettings;
   stream: StreamSettings;
   commentIntelligence: CommentIntelligenceSettings;
   manneri: ManneriSettings;

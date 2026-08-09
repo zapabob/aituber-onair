@@ -18,7 +18,12 @@ import type {
   MessageWithVision,
   ToolDefinition,
 } from '../../../types';
+import type { BaseChatServiceOptions } from '../ChatServiceProvider';
 import { buildOpenAIToolsDefinition } from './openaiToolBuilder';
+
+type OpenAIResponseFormat = NonNullable<
+  BaseChatServiceOptions['responseFormat']
+>;
 
 const GPT5_RESPONSE_LENGTH_MIN_TOKENS: Record<ChatResponseLength, number> = {
   [CHAT_RESPONSE_LENGTH.VERY_SHORT]: 800,
@@ -36,12 +41,15 @@ const GPT5_REASONING_MIN_TOKENS: Record<OpenAIReasoningEffort, number> = {
   medium: 4000,
   high: 8000,
   xhigh: 12000,
+  max: 25000,
 };
 
 const OPENAI_COMPATIBLE_CHAT_COMPLETIONS_PROVIDERS = new Set([
   'openai-compatible',
   'deepseek',
   'mistral',
+  'sakana',
+  'plamo',
 ]);
 
 type BuildOpenAIRequestBodyOptions = {
@@ -56,8 +64,20 @@ type BuildOpenAIRequestBodyOptions = {
   verbosity?: 'low' | 'medium' | 'high';
   reasoning_effort?: OpenAIReasoningEffort;
   enableReasoningSummary?: boolean;
+  responseFormat?: OpenAIResponseFormat;
   maxTokens?: number;
 };
+
+function toResponsesTextFormat(responseFormat: OpenAIResponseFormat): any {
+  if (responseFormat.type !== 'json_schema') {
+    return responseFormat;
+  }
+
+  return {
+    type: responseFormat.type,
+    ...responseFormat.json_schema,
+  };
+}
 
 /**
  * Build request body based on the endpoint type.
@@ -74,6 +94,7 @@ export function buildOpenAIRequestBody({
   verbosity,
   reasoning_effort,
   enableReasoningSummary,
+  responseFormat,
   maxTokens,
 }: BuildOpenAIRequestBodyOptions): any {
   const isResponsesAPI = endpoint === ENDPOINT_OPENAI_RESPONSES_API;
@@ -104,6 +125,9 @@ export function buildOpenAIRequestBody({
     if (tokenLimit !== undefined) {
       // OpenAI-compatible Chat Completions providers expect max_tokens.
       if (usesCompatibleChatCompletions(provider)) {
+        // Sakana Fugu recommends max_completion_tokens for new Chat
+        // Completions integrations, but accepts legacy max_tokens. Keep
+        // max_tokens for compatible providers to preserve existing behavior.
         body.max_tokens = tokenLimit;
       } else {
         body.max_completion_tokens = tokenLimit;
@@ -153,6 +177,17 @@ export function buildOpenAIRequestBody({
     }
   }
 
+  if (responseFormat) {
+    if (isResponsesAPI) {
+      body.text = {
+        ...body.text,
+        format: toResponsesTextFormat(responseFormat),
+      };
+    } else {
+      body.response_format = responseFormat;
+    }
+  }
+
   if (
     provider === 'mistral' &&
     isMistralReasoningEffortModel(model) &&
@@ -160,6 +195,19 @@ export function buildOpenAIRequestBody({
     isMistralReasoningEffort(reasoning_effort)
   ) {
     body.reasoning_effort = reasoning_effort;
+  }
+
+  if (provider === 'plamo' && reasoning_effort) {
+    body.reasoning_effort = reasoning_effort;
+  }
+
+  if (provider === 'deepseek' && reasoning_effort) {
+    body.thinking = {
+      type: reasoning_effort === 'none' ? 'disabled' : 'enabled',
+    };
+    if (reasoning_effort !== 'none') {
+      body.reasoning_effort = reasoning_effort;
+    }
   }
 
   const toolDefinitions = buildOpenAIToolsDefinition({
@@ -242,12 +290,25 @@ function validateMCPCompatibility(
 export function cleanMessagesForResponsesAPI(
   messages: (Message | MessageWithVision)[],
 ): any[] {
-  return messages.map((msg) => {
-    // Convert 'tool' role to 'user' for Responses API compatibility.
-    const role = msg.role === 'tool' ? 'user' : msg.role;
+  return messages.flatMap((msg) => {
+    if (msg.role === 'assistant' && msg.provider_content?.length) {
+      return msg.provider_content;
+    }
+
+    if (msg.role === 'tool' && msg.tool_call_id) {
+      return [
+        {
+          type: 'function_call_output',
+          call_id: msg.tool_call_id,
+          output: msg.content,
+        },
+      ];
+    }
+
+    const items: any[] = [];
 
     const cleanMsg: any = {
-      role: role,
+      role: msg.role === 'tool' ? 'user' : msg.role,
     };
 
     // Handle content (text or vision).
@@ -275,7 +336,22 @@ export function cleanMessagesForResponsesAPI(
       cleanMsg.content = msg.content;
     }
 
-    return cleanMsg;
+    const hasContent =
+      typeof cleanMsg.content !== 'string' || cleanMsg.content.length > 0;
+    if (hasContent) items.push(cleanMsg);
+
+    if (msg.role === 'assistant' && msg.tool_calls) {
+      items.push(
+        ...msg.tool_calls.map((call) => ({
+          type: 'function_call',
+          call_id: call.id,
+          name: call.function.name,
+          arguments: call.function.arguments,
+        })),
+      );
+    }
+
+    return items;
   });
 }
 

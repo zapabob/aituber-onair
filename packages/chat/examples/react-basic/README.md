@@ -4,7 +4,7 @@ Interactive web application demonstrating the @aituber-onair/chat package with R
 
 ## Features
 
-- 🔄 **Provider Switching** - Switch between OpenAI, OpenAI-compatible, Claude, Gemini, OpenRouter, Z.ai, and Kimi in real-time
+- 🔄 **Provider Switching** - Switch between OpenAI, OpenAI-compatible, Claude, Gemini, OpenRouter, Z.ai, Kimi, DeepSeek, Mistral, browser-disabled Sakana AI, and PLaMo in real-time
 - 💬 **Real-time Streaming** - See AI responses as they're generated
 - 📝 **Chat History** - Full conversation history with role indicators
 - 🖼️ **Vision Support** - Upload and analyze images (drag & drop supported)
@@ -45,6 +45,7 @@ Interactive web application demonstrating the @aituber-onair/chat package with R
   - Kimi (Moonshot): https://platform.moonshot.cn/
   - DeepSeek: https://platform.deepseek.com/
   - Mistral: https://console.mistral.ai/
+  - PLaMo: https://plamo.preferredai.jp/
 
 ### Scripts
 
@@ -76,7 +77,7 @@ react-basic/
 
 ### Basic Chat
 
-1. Select a provider (OpenAI, OpenAI-compatible, Claude, Gemini, OpenRouter, Z.ai, Kimi, DeepSeek, or Mistral)
+1. Select a provider (OpenAI, OpenAI-compatible, Claude, Gemini, OpenRouter, Z.ai, Kimi, DeepSeek, Mistral, browser-disabled Sakana AI, or PLaMo)
 2. Enter your API key
 3. Type a message and press Enter or click Send
 4. Watch the AI response stream in real-time
@@ -99,11 +100,25 @@ react-basic/
 ### Response Length Control
 
 Use the dropdown to select response length:
-- Very Short: ~50 tokens
+- Very Short: ~40 tokens
 - Short: ~100 tokens
 - Medium: ~200 tokens (default)
-- Long: ~500 tokens
+- Long: ~300 tokens
 - Very Long: ~1000 tokens
+- Deep: ~5000 tokens
+
+OpenRouter dynamic routers (`openrouter/auto` and `openrouter/auto-beta`) do not
+send token limits derived from these presets because a routed reasoning model
+can consume the output budget before producing visible text. Use a length
+instruction in the prompt when selecting either router.
+
+For Gemini Nano, the presets also apply concrete sentence-count guidance:
+`Very Short` up to 1 sentence, `Short` up to 2, `Medium` up to 3, `Long` up
+to 5, and `Very Long` up to 10. `Deep` has no sentence-count limit. The
+example supplies two short Japanese user/assistant examples through
+`initialPrompts` only for `Very Short` and `Short`, so longer presets are not
+biased toward one-sentence answers. Chat input remains disabled until the
+built-in model status is `available`.
 
 ### Provider-Specific Features
 
@@ -120,19 +135,24 @@ Use the dropdown to select response length:
 - Best for: local LLMs (Ollama/LM Studio/vLLM-compatible endpoints)
 
 **Claude**
-- Models: Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude 4.5 (Opus, Sonnet, Haiku), plus deprecated-but-still-available Claude 4 (Sonnet, Opus) and Claude 3 Haiku
+- Models: Claude Opus 5, Claude Sonnet 5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude 4.5 (Opus, Sonnet, Haiku), plus deprecated-but-still-available Claude 4 (Sonnet, Opus) and Claude 3 Haiku
 - Vision: All listed Claude models
+- Effort: Supported models expose model-aware Low/Medium/High/XHigh/Max options. The control maps to `output_config.effort` and defaults to High.
 - Best for: Long context, tool use + advanced reasoning
 
 **Gemini**
-- Models: Gemini 3.5 Flash, Gemini 3.1 Flash-Lite, Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, Gemini 2.5 Pro/Flash/Flash Lite, Gemma 4 31B IT, Gemma 4 26B A4B IT
+- Models: Gemini 3.6 Flash, Gemini 3.5 Flash/Flash-Lite, Gemini 3.1 Flash-Lite, Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, Gemini 2.5 Pro/Flash/Flash Lite, Gemma 4 31B IT, Gemma 4 26B A4B IT
 - Vision: Supported for all listed Gemini models. Deprecated lifecycle models remain selectable with a deprecated label for explicit compatibility.
-- Best for: Fast responses, cost-effective. Gemini 3.5 Flash automatically uses minimal thinking for chat-style responses.
+- Reasoning Effort: Gemini 3 Flash/Flash-Lite exposes Minimal/Low/Medium/High and defaults to Minimal; Gemini 3 Pro exposes Low/Medium/High and defaults to Low. Gemini 2.5 uses `thinkingBudget`, so this control is disabled for 2.5 models.
+- Best for: Fast responses, cost-effective. Minimal thinking keeps chat latency and hidden-token usage low.
 
 **OpenRouter**
-- Models: Curated multi-provider model list (OpenRouter Auto/Fusion, OpenAI/Claude/Gemini latest aliases, OpenAI GPT-5.5, Z.ai, Kimi)
+- Models: Curated multi-provider model list (OpenRouter Auto/Auto Beta/Fusion, OpenAI GPT-5.6, Claude Opus 5, Gemini 3.6/3.5, Z.ai, xAI, Kimi K3, DeepSeek V4 Flash 0731/0423, KAT-Coder V2.5)
 - Vision: Depends on selected routed model
+- Reasoning Effort: Model-aware options. DeepSeek V4 Flash 0731 exposes None/Low/High/Max; the older unversioned 0423 snapshot exposes None/High/XHigh. None is the default and disables reasoning rather than only hiding it.
 - Best for: Flexible model routing and unified API usage
+- Auto Beta: Selects a model per request and charges the selected model's rate
+- Coding models: KAT-Coder-Air/Pro V2.5 are explicit text-only options, not defaults
 - Fusion Cost: `openrouter/fusion` bills the combined underlying model calls and any enabled web search/fetch usage
 - Dynamic Free Models: Click `Fetch free models` to probe currently available `:free` models and append working IDs to the model list
 - Max candidates: Adjustable in UI (default `1`) to control probe request volume
@@ -140,29 +160,37 @@ Use the dropdown to select response length:
 - Persistence: Fetched dynamic free model IDs are saved under localStorage root key `AITuberOnAirChat_example_react-basic`
 
 **Z.ai**
-- Models: GLM-5, GLM-5-Turbo, GLM-4.7/4.6, GLM-4.6V family
-- Vision: GLM-4.6V family (`glm-5` and `glm-5-turbo` are currently text-only)
+- Models: GLM-5.2, GLM-5.1, GLM-5, GLM-5-Turbo, GLM-5V-Turbo, GLM-4.7/4.6, GLM-4.6V family
+- Vision: GLM-5V-Turbo and GLM-4.6V family (`glm-5.2`, `glm-5.1`, `glm-5`, and `glm-5-turbo` are text-only)
 - Best for: OpenAI-compatible GLM integration
 
 **xAI**
-- Models: Grok 4.3, Grok 4.20 Reasoning/Non-Reasoning, Grok 4-1 Fast Reasoning/Non-Reasoning
+- Models: Grok 4.5, Grok 4.3, Grok 4.20 Reasoning/Non-Reasoning, Grok 4-1 Fast Reasoning/Non-Reasoning
 - Vision: Supported
 - Best for: Grok models with OpenAI-compatible API
+- Grok 4.5 exposes `reasoning_effort` and defaults to `low` for chat-style responses; Grok 4.3 defaults to `none` for lower latency
 
 **Kimi**
-- Models: Kimi K2.6, Kimi K2.5
+- Models: Kimi K3, Kimi K2.7 Code, Kimi K2.7 Code HighSpeed, Kimi K2.6, Kimi K2.5
 - Vision: Supported
-- Best for: Moonshot models with OpenAI-compatible API
+- Best for: Moonshot models with OpenAI-compatible API. Kimi K2.6 remains the chat-oriented default; Kimi K3 is an explicit reasoning option, and Kimi K2.7 Code models are coding-oriented.
+- Kimi K3 reasoning: selectable `low`, `high`, or `max`, with `max` as the API default. Reasoning cannot be disabled.
 
 **DeepSeek**
 - Models: DeepSeek V4 Flash, DeepSeek V4 Pro
 - Vision: Not pre-validated as supported
+- Reasoning Effort: V4 Flash exposes None/Low/High/Max; V4 Pro exposes None/High/Max. None is the default for responsive chat. Thinking with tool calling is not supported yet.
 - Best for: DeepSeek's OpenAI-compatible API without manually configuring an endpoint
 
 **Mistral**
-- Models: Mistral Small Latest, Mistral Medium 3.5, Mistral Large Latest, Mistral Large 3, Mistral Small 4, Mistral Medium 3.1
+- Models: Mistral Small Latest, Ministral 3 3B/8B/14B, Mistral Medium 3.5, Mistral Large Latest, Mistral Large 3, Mistral Small 4, Mistral Medium 3.1
 - Vision: Supported
 - Best for: Mistral Chat Completions with streaming and optional adjustable reasoning
+
+**PLaMo**
+- Models: PLaMo 3.0 Prime, PLaMo 2.2 Prime
+- Vision: Not supported by this provider
+- Best for: Japanese-focused chat through PLaMo's OpenAI-compatible API
 
 ### OpenRouter Dynamic Free Models (Manual Check)
 
@@ -193,7 +221,13 @@ npm install
 
 ### CORS Issues
 
-The Vite dev server proxies API requests to avoid CORS issues. For production, you'll need to:
+The Vite dev server proxies some API requests to avoid CORS issues. Sakana AI
+is shown as a disabled provider in this browser example because direct browser
+requests can fail with CORS unless Sakana enables the required CORS headers for
+your origin. Use `../node-basic/sakana-example.js` from Node.js, or call Sakana through your own
+backend/serverless proxy in a web app.
+
+For production, you'll need to:
 1. Use a backend proxy
 2. Configure CORS on your server
 3. Use provider SDKs that handle CORS

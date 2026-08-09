@@ -13,6 +13,7 @@ export type {
   MinimaxAudioSettingsOptions,
   MinimaxAudioFormat,
   PiperPlusVoiceServiceOptions,
+  WebSpeechVoiceServiceOptions,
   UnrealSpeechVoiceServiceOptions,
   ElevenLabsVoiceServiceOptions,
   InworldVoiceServiceOptions,
@@ -33,6 +34,12 @@ export * from './engines';
 // Types
 export * from './types/voice';
 export * from './types/voiceEngine';
+export type {
+  VoiceEngineCapabilities,
+  VoiceEngineVoice,
+  VoiceEngineVoiceListOptions,
+  VoiceRuntime,
+} from './types/capabilities';
 export * from './types/chat';
 
 // Utils
@@ -42,6 +49,11 @@ export {
   screenplayToText,
 } from './utils/screenplay';
 export { EmotionParser, emotionToTalkStyle } from './utils/emotionParser';
+export {
+  getAllVoiceEngineCapabilities,
+  getVoiceEngineCapabilities,
+} from './utils/voiceEngineCapabilities';
+export { getVoiceEngineVoiceList } from './utils/voiceEngineVoiceList';
 
 // Voice-specific messages utility
 export {

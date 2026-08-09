@@ -1,5 +1,9 @@
 # PNGTuber Chat
 
+Web Speech API TTS ではブラウザ音声の選択と rate、pitch、volume、language
+を設定できます。ブラウザが直接再生して音声バッファを取得できないため、
+このエンジン選択時はリップシンク非対応です。
+
 ![react-pngtuber-app image](./images/react-pngtuber-app.png)
 
 `@aituber-onair/core` を使った PNGTuber 風チャットアプリです。  
@@ -7,18 +11,21 @@
 
 ## このアプリでできること
 
-- LLM プロバイダ切り替え: `openai`, `openai-compatible`, `openrouter`, `gemini`, `gemini-nano`, `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`
+- LLM プロバイダ切り替え: `openai`, `openai-compatible`, `openrouter`, `gemini`, `gemini-nano`, `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`, `sakana`（ブラウザ UI では disabled 表示）, `plamo`
+- xAI Grok 4.5 の `reasoning_effort` は `low`、Grok 4.3 は低レイテンシ向けに `none` がデフォルトです
 - モデル一覧は `@aituber-onair/core` の対応モデルから動的取得するため、
-  Gemini 3.5 Flash や GPT-5.5 など chat 由来の新規モデルも Settings に
+  Gemini 3.6 Flash、Kimi K3、Ministral 3、GLM-5V-Turbo、GPT-5.6 など
+  chat 由来の新規モデルも Settings に
   自動反映されます
-- Gemini 3.5 Flash はチャット用途向けに minimal thinking を自動適用します
+- Gemini 3 Flash 系はチャット用途向けに minimal thinking、Gemini 3 Pro
+  は low をデフォルトで適用します
 - `gpt-5.5-pro` は OpenAI のドキュメント上でストリーミング非対応のため、
   ストリーミング前提の通常チャットフローを使うこの例では含めていません
 - `openrouter` では Settings から現在使える `:free` モデルを取得可能:
   - `Fetch free models` で候補を疎通確認し、通ったモデルを一覧に追加
   - `Max candidates` は「疎通確認する `:free` 候補の最大件数」
     （「N件見つかるまで試行」ではありません）
-- TTS エンジン切り替え: `openai`, `geminiTts`, `openaiCompatible`, `voicevox`, `voicepeak`, `aivisSpeech`, `aivisCloud`, `minimax`, `xai`, `unrealSpeech`, `elevenLabs`, `inworld`, `piperPlus`, `none`
+- TTS エンジン切り替え: `openai`, `geminiTts`, `openaiCompatible`, `voicevox`, `voicepeak`, `aivisSpeech`, `aivisCloud`, `minimax`, `xai`, `unrealSpeech`, `elevenLabs`, `inworld`, `piperPlus`, `webSpeech`, `none`
 - `geminiTts` は `gemini-3.1-flash-tts-preview` を既定利用し、30 種類のプリセットボイスとスタイル / audio-tag プロンプト入力に対応
 - スピーカー一覧の動的取得と選択:
   - `voicevox` / `aivisSpeech`: `/speakers` から取得
@@ -32,11 +39,16 @@
 - リアルタイム口パク + ランダムまばたき
 - Settings 画面から見た目をその場で設定:
   - 背景画像（1枚）
+  - グリーンバック背景
+  - アバター発話字幕だけを出すソロ配信表示
   - アバター画像（4状態: 口開閉/目開閉）
-- 画像設定はメモリ保持のみ（リロードで初期化）
+- 表示設定は `localStorage` に保存され、アップロード画像はメモリ保持のみ
+  （リロードで初期化）
 - YouTube Live / Twitch のライブチャットを取得して LLM パイプラインに流す
   - YouTube は YouTube Data API v3 を利用（Google Cloud の API キーが必要）
   - Twitch は EventSub WebSocket とブラウザ上での implicit OAuth フローを利用
+- **Settings → Screen Vision** から OBS Virtual Camera の1フレームを取得し、
+  Vision 対応モデルに送ってアバターがコメント
 - `@aituber-onair/manneri` で会話の繰り返し傾向を検出し、次の応答前に
   内部的な話題転換指示を追加
 
@@ -50,6 +62,8 @@ npm run dev
 
 起動後に **Settings** を開き、APIキーや各種設定を入力してください。  
 設定値は `localStorage`（`react-pngtuber-app-settings`）に保存されます。
+LLM セクションではシステムプロンプトも編集できます。入力欄からフォーカスが
+外れた時に反映され、ほかの設定と一緒に保存されます。
 
 `openai-compatible` 利用時は以下を設定してください。
 - `Endpoint URL`（必須。`/v1/chat/completions` まで含む URL）
@@ -66,6 +80,19 @@ npm run dev
 
 このサンプルでは YouTube Live / Twitch のライブチャットを LLM に流し込むことができます。
 **Settings → Stream** から設定します。
+
+## Screen Vision
+
+OBS Virtual Camera を開始し、**Settings → Screen Vision** で選択してから
+**画面を見る** を押すと、現在のフレームを Vision 対応モデルに送信します。
+30秒、1分、2分、5分ごとの自動送信も選択できます。
+
+## 配信用表示
+
+**Settings → Visual** から背景をグリーンバックに切り替え、表示モードを
+ソロ配信にできます。ソロ配信では通常のチャットログを隠し、アバターの
+最新発話だけを下部字幕として表示します。ユーザー入力欄は初期状態では
+非表示ですが、同じ Visual 設定から表示できます。
 
 同時に有効化できるのはどちらか一方だけです。
 
@@ -231,3 +258,11 @@ Settings からアップロードした画像は、そのセッション中の�
 - `@aituber-onair/core`（LLM + TTS）
 - Web Speech API（音声入力）
 - Web Audio API + `AnalyserNode`（口パク解析）
+
+## 同梱ミコ素材の利用条件
+
+4枚のデフォルトPNGTuber画像は、AITuber OnAir公式キャラクター「ミコ」の
+素材であり、ソフトウェアのMIT License対象外です。作品・コンテンツの一部として
+一体で再配布できますが、素材単体・素材集としての再配布は禁止されています。
+正式版である日本語ガイドラインについては
+[Miko Asset Terms](./MIKO_ASSET_TERMS.md)を参照してください。

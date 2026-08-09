@@ -4,11 +4,14 @@ import {
   GEMINI_TTS_VOICES,
   GRADIUM_VOICE_OPTIONS,
   INWORLD_VOICE_LANGUAGE_OPTIONS,
+  MINIMAX_SYSTEM_VOICE_OPTIONS,
   OPENAI_VOICES,
+  WEB_SPEECH_VOICE_LANGUAGE_OPTIONS,
   XAI_VOICE_OPTIONS,
   type EngineType,
   type InworldVoiceLanguageOption,
   type SpeakerOption,
+  type WebSpeechVoiceLanguageOption,
 } from '../constants';
 
 interface EngineSelectorProps {
@@ -28,6 +31,10 @@ interface EngineSelectorProps {
   onMinimaxGroupIdChange: (nextValue: string) => void;
   inworldVoiceLanguage: InworldVoiceLanguageOption;
   onInworldVoiceLanguageChange: (nextValue: InworldVoiceLanguageOption) => void;
+  webSpeechVoiceLanguage: WebSpeechVoiceLanguageOption;
+  onWebSpeechVoiceLanguageChange: (
+    nextValue: WebSpeechVoiceLanguageOption,
+  ) => void;
   apiKeyIsRequired: boolean;
   piperPlusAvailable: boolean;
   piperPlusLoading: boolean;
@@ -51,6 +58,8 @@ export function EngineSelector({
   onMinimaxGroupIdChange,
   inworldVoiceLanguage,
   onInworldVoiceLanguageChange,
+  webSpeechVoiceLanguage,
+  onWebSpeechVoiceLanguageChange,
   apiKeyIsRequired,
   piperPlusAvailable,
   piperPlusLoading,
@@ -82,6 +91,80 @@ export function EngineSelector({
   const renderSpeakerField = () => {
     if (engine === 'piperPlus') {
       return null;
+    }
+
+    if (engine === 'webSpeech') {
+      const webSpeechSpeakerOptions =
+        webSpeechVoiceLanguage === 'all'
+          ? speakerOptions
+          : speakerOptions.filter((option) =>
+              option.language?.toLowerCase().startsWith(webSpeechVoiceLanguage),
+            );
+      const hasWebSpeechSpeakerOptions = webSpeechSpeakerOptions.length > 0;
+
+      return (
+        <div className="form-group">
+          <label htmlFor="speaker">Speaker:</label>
+          <select
+            id="speaker"
+            value={hasWebSpeechSpeakerOptions ? speaker : ''}
+            onChange={(e) => onSpeakerChange(e.target.value)}
+            disabled={!hasWebSpeechSpeakerOptions}
+          >
+            {hasWebSpeechSpeakerOptions ? (
+              webSpeechSpeakerOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))
+            ) : (
+              <option value="">
+                {isFetchingSpeakers
+                  ? '-- Loading browser voices --'
+                  : hasSpeakerOptions
+                    ? '-- No voices for selected language --'
+                    : '-- Browser default voice --'}
+              </option>
+            )}
+          </select>
+          <div className="web-speech-filter-row">
+            <div className="web-speech-language-field">
+              <label htmlFor="webSpeechVoiceLanguage">Language:</label>
+              <select
+                id="webSpeechVoiceLanguage"
+                value={webSpeechVoiceLanguage}
+                onChange={(e) =>
+                  onWebSpeechVoiceLanguageChange(
+                    e.target.value as WebSpeechVoiceLanguageOption,
+                  )
+                }
+                disabled={isFetchingSpeakers || !hasSpeakerOptions}
+              >
+                {Object.entries(WEB_SPEECH_VOICE_LANGUAGE_OPTIONS).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="secondary-action-button"
+              onClick={onFetchSpeakers}
+              disabled={isFetchingSpeakers}
+            >
+              {isFetchingSpeakers ? '取得中...' : '再読み込み'}
+            </button>
+          </div>
+          {speakerFetchError && (
+            <div className="speaker-fetch-message speaker-fetch-message--error">
+              {speakerFetchError}
+            </div>
+          )}
+        </div>
+      );
     }
 
     if (engine === 'openai') {
@@ -172,19 +255,41 @@ export function EngineSelector({
           <label htmlFor="speaker">Speaker:</label>
           <select
             id="speaker"
-            value={hasSpeakerOptions ? speaker : ''}
+            value={speaker}
             onChange={(e) => onSpeakerChange(e.target.value)}
-            disabled={!hasSpeakerOptions}
           >
-            {hasSpeakerOptions ? (
-              speakerOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))
-            ) : (
-              <option value="">-- 話者一覧を取得してください --</option>
-            )}
+            {MINIMAX_SYSTEM_VOICE_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <div className="speaker-fetch-message">
+            MiniMax の動的な voice list API は現在確認できないため、公式 System
+            Voice ID List の代表的なプリセットを表示しています。
+          </div>
+        </div>
+      );
+    }
+
+    if (engine === 'gradium') {
+      const gradiumSpeakerOptions = hasSpeakerOptions
+        ? speakerOptions
+        : GRADIUM_VOICE_OPTIONS;
+
+      return (
+        <div className="form-group">
+          <label htmlFor="speaker">Speaker:</label>
+          <select
+            id="speaker"
+            value={speaker}
+            onChange={(e) => onSpeakerChange(e.target.value)}
+          >
+            {gradiumSpeakerOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
           </select>
           <div className="speaker-fetch-row">
             <button
@@ -206,27 +311,9 @@ export function EngineSelector({
               {speakerFetchError}
             </div>
           )}
-        </div>
-      );
-    }
-
-    if (engine === 'gradium') {
-      return (
-        <div className="form-group">
-          <label htmlFor="speaker">Speaker:</label>
-          <select
-            id="speaker"
-            value={speaker}
-            onChange={(e) => onSpeakerChange(e.target.value)}
-          >
-            {GRADIUM_VOICE_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
           <div className="speaker-fetch-message">
-            Gradium の話者一覧 API はブラウザ CORS の制約があるため、 公式
+            API Key を入力すると Gradium の話者一覧取得を試せます。ブラウザ CORS
+            で失敗する場合は backend proxy を使用してください。未取得時は 公式
             flagship voice をプリセット表示しています。
           </div>
         </div>
@@ -502,6 +589,7 @@ export function EngineSelector({
           <option value="gradium">Gradium</option>
           <option value="openaiCompatible">OpenAI-Compatible TTS</option>
           <option value="piperPlus">Piper Plus (Browser WASM)</option>
+          <option value="webSpeech">Web Speech API (Browser)</option>
         </select>
       </div>
 

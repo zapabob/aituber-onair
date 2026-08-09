@@ -61,7 +61,7 @@ pnpm install @aituber-onair/voice
 - **Multiple TTS Engine Support**  
   Compatible with VOICEVOX, VoicePeak, OpenAI TTS, xAI TTS, Unreal Speech,
   ElevenLabs, Inworld, Gradium, Gemini TTS, MiniMax, AivisSpeech, Aivis Cloud,
-  and more
+  Web Speech API, and more
 - **Unified Interface**  
   Single API for all supported TTS engines
 - **Emotion-Aware Synthesis**  
@@ -282,9 +282,11 @@ const voiceService = new VoiceService({
 Use `gradiumApiUrl` to override the default
 `https://api.gradium.ai/api/post/speech/tts` endpoint. The `speaker` value is
 sent as Gradium `voice_id`. The React example uses Gradium flagship voice
-presets so browser users can select readable names while keeping the voice ID
-as the submitted value. Gradium's voice-list endpoint may require a server-side
-call in browser apps because its CORS policy can differ from the TTS endpoint.
+presets as a fallback and can fetch the Gradium voice list through
+`getVoiceEngineVoiceList()` when an API key is provided. Browser-side voice
+list requests may fail if the Gradium API does not allow direct CORS access;
+use a backend proxy for production browser UIs that need dynamic Gradium voice
+selection.
 
 ### OpenAI-Compatible TTS
 OpenAI-compatible speech endpoints for self-hosted servers such as Kokoro FastAPI.
@@ -308,7 +310,7 @@ Multi-language TTS supporting 24 languages with HD quality.
 ```typescript
 const voiceService = new VoiceService({
   engineType: 'minimax',
-  speaker: 'male-qn-qingse',
+  speaker: 'Japanese_IntellectualSenior',
   apiKey: 'your-minimax-api-key',
   groupId: 'your-group-id', // Required for MiniMax
   endpoint: 'global' // or 'china'
@@ -316,6 +318,12 @@ const voiceService = new VoiceService({
 ```
 
 **Note**: MiniMax requires both API key and GroupId for authentication. The GroupId is used for user group management, usage tracking, and billing.
+
+Use MiniMax system voice IDs for `speaker`, such as
+`Japanese_IntellectualSenior`. MiniMax documents these IDs in its
+[System Voice ID List](https://platform.minimax.io/docs/faq/system-voice-id).
+The linked dynamic Get Voice API is not currently available, so
+`getVoiceEngineVoiceList()` does not expose MiniMax voice-list fetching.
 
 ### AivisSpeech
 AI-powered speech synthesis with natural voice quality.
@@ -357,6 +365,15 @@ const voiceService = new VoiceService({
 - **Emotion Control**: Fine-grained emotional intensity settings
 - **High Quality**: Professional-grade voice synthesis
 
+`getVoiceEngineVoiceList('aivisCloud')` uses the Aivis Cloud model search API
+(`GET https://api.aivis-project.com/v1/aivm-models/search`) and returns model
+UUID choices that can be passed as `speaker` or `aivisCloudModelUuid`. Direct
+browser requests to model/list endpoints can fail CORS checks, so browser apps
+should call this helper from a Node.js backend or relay/proxy when they need
+dynamic model, speaker, or style selection. The React example intentionally
+keeps manual model UUID input instead of calling the model search endpoint from
+the browser.
+
 ### Gemini TTS
 Gemini API text-to-speech with Gemini preview TTS models, including
 `gemini-3.1-flash-tts-preview`, and simple API key authentication.
@@ -377,6 +394,29 @@ const voiceService = new VoiceService({
 **Note**: Use a standard Google API key. `apiKey` is sent as
 `x-goog-api-key` to the Gemini API. Available voices include Zephyr, Aoede,
 Kore, Puck, Charon, and 25+ more prebuilt voices.
+
+### Web Speech API
+Browser-native speech synthesis through `window.speechSynthesis`. This engine
+does not return audio bytes; the browser plays speech directly.
+
+```typescript
+const voiceService = new VoiceEngineAdapter({
+  engineType: 'webSpeech',
+  speaker: '', // Optional: SpeechSynthesisVoice name or voiceURI
+  webSpeechLanguage: 'ja-JP',
+  webSpeechRate: 1.1,
+  webSpeechPitch: 1.0,
+  webSpeechVolume: 1.0,
+});
+
+await voiceService.speak({ text: 'こんにちは' });
+```
+
+Use `getVoiceEngineVoiceList('webSpeech')` in a browser to list available
+`SpeechSynthesisVoice` entries. Some browsers populate voices asynchronously,
+so the helper waits briefly for `voiceschanged`. Because no `ArrayBuffer` is
+available, `onPlay(audioBuffer)` is skipped for this engine; `onComplete` still
+runs when the utterance ends. Runtime support is browser-only.
 
 ### None (Silent Mode)
 No audio output - useful for testing or text-only scenarios.
@@ -657,12 +697,14 @@ try {
 - Passes `speaker` through to `voice_id` as provided
 - Configurable output format and `json_config` controls for temperature, voice similarity, speed, and rewrite rules
 - Flagship voice presets provide readable names for browser speaker selectors
+- Dynamic voice-list lookups may require a backend proxy in browser apps if the provider blocks direct CORS access
 
 ### MiniMax Features
 - 24 language support with automatic detection
 - HD quality audio output
 - Dual-region endpoints (global/china)
 - Advanced emotion synthesis
+- Uses documented system voice IDs instead of dynamic voice-list fetching
 
 ### Gemini TTS Features
 - Gemini API-based high-quality voice synthesis
@@ -671,6 +713,12 @@ try {
 - Simple API key authentication with `x-goog-api-key`
 - Configurable Gemini API base URL
 - 24+ language support including Japanese
+
+### Web Speech API Features
+- Browser-native `speechSynthesis` playback with no API key
+- Browser-only runtime; no Node.js or server audio byte output
+- Supports voice selection by `SpeechSynthesisVoice.name` or `voiceURI`
+- Supports rate, pitch, volume, and language options where the browser voice honors them
 
 ## Integration with AITuber OnAir Core
 
@@ -712,6 +760,7 @@ type VoiceServiceOptions =
   | AivisCloudVoiceServiceOptions
   | MinimaxVoiceServiceOptions
   | PiperPlusVoiceServiceOptions
+  | WebSpeechVoiceServiceOptions
   | NoneVoiceServiceOptions;
 ```
 
@@ -720,6 +769,53 @@ Use `updateOptions(...)` for same-engine updates and `switchEngine(...)`
 for cross-engine changes.
 For backward compatibility, cross-engine fields in `updateOptions(...)`
 are still accepted.
+
+### Engine Capabilities
+
+```typescript
+import {
+  getAllVoiceEngineCapabilities,
+  getVoiceEngineCapabilities,
+} from '@aituber-onair/voice';
+
+const gradium = getVoiceEngineCapabilities('gradium');
+console.log(gradium.supportsVoiceList); // true
+
+const allEngines = getAllVoiceEngineCapabilities();
+```
+
+Capabilities are static metadata only. They do not include API keys,
+endpoints, user configuration, or other sensitive values.
+
+### Voice Lists
+
+```typescript
+import { getVoiceEngineVoiceList } from '@aituber-onair/voice';
+
+const voices = await getVoiceEngineVoiceList('elevenLabs', {
+  apiKey: process.env.ELEVENLABS_API_KEY,
+});
+
+// [{ id: '...', label: 'Rachel (premade)' }, ...]
+```
+
+`getVoiceEngineVoiceList()` returns normalized `{ id, label }` items for
+engines that expose list APIs: VOICEVOX, AivisSpeech, Aivis Cloud, xAI,
+ElevenLabs, Inworld, Gradium, and Web Speech API. Pass local `apiUrl` for
+VOICEVOX-compatible servers, `apiKey` for cloud engines that require it, and
+`language` for Inworld filtering.
+
+For browser apps, cloud provider voice-list endpoints must allow CORS. If a
+provider blocks direct browser requests, call `getVoiceEngineVoiceList()` from
+your backend or expose a small backend relay/proxy for the list endpoint.
+
+Aivis Cloud voice-list support is package-level support for the model search
+endpoint. Browser requests to Aivis Cloud model/list endpoints can be blocked
+by CORS; call the helper from Node.js/backend or expose a backend proxy before
+wiring dynamic Aivis Cloud model selection into a production UI.
+
+MiniMax is also excluded from this helper. Use the documented system voice IDs
+directly because the linked dynamic Get Voice API is currently unavailable.
 
 ### VoiceService Methods
 

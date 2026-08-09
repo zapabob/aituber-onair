@@ -1,5 +1,6 @@
 import {
   VoiceEngineAdapter,
+  getVoiceEngineVoiceList,
   type AivisSpeechQueryParameterOverrides,
   type ElevenLabsApplyTextNormalization,
   type GeminiTtsModel,
@@ -13,11 +14,12 @@ import {
   type VoicepeakEmotionInput,
   type VoicepeakEmotionWeights,
   type VoiceVoxQueryParameterOverrides,
+  type VoiceEngineType,
   type XaiBitRate,
   type XaiCodec,
   type XaiSampleRate,
 } from '@aituber-onair/voice';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import './App.css';
 import { EngineParameters } from './components/EngineParameters';
 import { EngineSelector } from './components/EngineSelector';
@@ -44,98 +46,12 @@ import {
   type LocalOutputSamplingRateOption,
   type OutputStereoOption,
   type SpeakerOption,
+  type WebSpeechVoiceLanguageOption,
   type VoicePeakEmotionOption,
   type VoicepeakEmotionMode,
   VOICEPEAK_WEIGHT_KEYS,
 } from './constants';
 import { usePiperPlusStatus } from './hooks/usePiperPlusStatus';
-
-interface VoicevoxSpeakerStyleResponse {
-  id: number;
-  name: string;
-}
-
-interface VoicevoxSpeakerResponse {
-  name: string;
-  styles: VoicevoxSpeakerStyleResponse[];
-}
-
-interface MinimaxSpeakerResponse {
-  voice_id: string;
-  voice_name: string;
-  gender?: string;
-  language?: string;
-}
-
-interface MinimaxSpeakerListResponse {
-  base_resp?: {
-    status_code?: number;
-    status_msg?: string;
-  };
-  data?: {
-    speakers?: MinimaxSpeakerResponse[];
-  };
-}
-
-interface XaiVoiceResponse {
-  voice_id: string;
-  name: string;
-}
-
-interface XaiVoiceListResponse {
-  voices?: XaiVoiceResponse[];
-}
-
-interface ElevenLabsVoiceResponse {
-  voice_id: string;
-  name: string;
-  category?: string;
-  description?: string;
-}
-
-interface ElevenLabsVoiceListResponse {
-  voices?: ElevenLabsVoiceResponse[];
-}
-
-interface InworldVoiceResponse {
-  voiceId: string;
-  displayName?: string;
-  langCode?: string;
-  promptLanguages?: string[];
-  source?: string;
-  gender?: string;
-}
-
-interface InworldVoiceListResponse {
-  voices?: InworldVoiceResponse[];
-  nextPageToken?: string;
-}
-
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
-const isNonEmptyString = (value?: string): value is string => Boolean(value);
-
-const formatInworldLanguage = (voice: InworldVoiceResponse): string => {
-  const languages = [voice.langCode, ...(voice.promptLanguages ?? [])].filter(
-    isNonEmptyString,
-  );
-  const uniqueLanguages = Array.from(
-    new Set(
-      languages.map((language) =>
-        language.includes('_') ? language.replace('_', '-') : language,
-      ),
-    ),
-  );
-
-  return uniqueLanguages.join(', ') || 'unknown';
-};
-
-const isJapaneseInworldVoice = (voice: InworldVoiceResponse): boolean => {
-  const languages = [voice.langCode, ...(voice.promptLanguages ?? [])]
-    .filter(isNonEmptyString)
-    .map((language) => language.toLowerCase().replace('_', '-'));
-
-  return languages.some((language) => language.startsWith('ja'));
-};
 
 const createInitialVoicepeakEmotionWeights = (): Record<
   (typeof VOICEPEAK_WEIGHT_KEYS)[number],
@@ -147,6 +63,21 @@ const createInitialVoicepeakEmotionWeights = (): Record<
   sad: '',
   surprised: '',
 });
+
+function formatSpeakerFetchError(error: unknown): string {
+  const message =
+    error instanceof Error ? error.message : 'Failed to fetch speakers';
+
+  if (
+    message === 'Failed to fetch' ||
+    message.includes('NetworkError') ||
+    message.includes('Load failed')
+  ) {
+    return `${message}. This may be a browser CORS or network failure. If the provider does not allow direct browser requests, use a backend proxy for voice list lookups.`;
+  }
+
+  return message;
+}
 
 function App() {
   const [engine, setEngine] = useState<EngineType>('openai');
@@ -267,6 +198,8 @@ function App() {
     useState<InworldVoiceLanguageOption>(
       ENGINE_DEFAULTS.inworld.defaultLanguage,
     );
+  const [webSpeechVoiceLanguage, setWebSpeechVoiceLanguage] =
+    useState<WebSpeechVoiceLanguageOption>('all');
   const [inworldDeliveryMode, setInworldDeliveryMode] =
     useState<InworldDeliveryModeOption>('default');
   const [inworldTemperature, setInworldTemperature] = useState('');
@@ -379,6 +312,30 @@ function App() {
     }
   };
 
+  const changeWebSpeechVoiceLanguage = (
+    nextLanguage: WebSpeechVoiceLanguageOption,
+  ) => {
+    setWebSpeechVoiceLanguage(nextLanguage);
+
+    if (nextLanguage === 'all') {
+      setSpeaker((currentSpeaker) =>
+        speakerOptions.some((option) => option.id === currentSpeaker)
+          ? currentSpeaker
+          : (speakerOptions[0]?.id ?? ''),
+      );
+      return;
+    }
+
+    const matchingSpeakers = speakerOptions.filter((option) =>
+      option.language?.toLowerCase().startsWith(nextLanguage),
+    );
+    setSpeaker((currentSpeaker) =>
+      matchingSpeakers.some((option) => option.id === currentSpeaker)
+        ? currentSpeaker
+        : (matchingSpeakers[0]?.id ?? ''),
+    );
+  };
+
   useEffect(() => {
     const defaults = ENGINE_DEFAULTS[engine];
     const minimaxDefaults = ENGINE_DEFAULTS.minimax;
@@ -450,6 +407,7 @@ function App() {
     setInworldSpeakingRate('');
     setInworldLanguage(ENGINE_DEFAULTS.inworld.defaultLanguage);
     setInworldVoiceLanguage(ENGINE_DEFAULTS.inworld.defaultLanguage);
+    setWebSpeechVoiceLanguage('all');
     setInworldDeliveryMode('default');
     setInworldTemperature('');
     setGradiumOutputFormat(ENGINE_DEFAULTS.gradium.defaultOutputFormat);
@@ -498,19 +456,22 @@ function App() {
     setStatus(
       engine === 'piperPlus'
         ? 'Switched to piperPlus. Place assets in public/piper/ and review the setup guide below.'
-        : `Switched to ${engine}. Default URL: ${defaults.apiUrl}`,
+        : engine === 'webSpeech'
+          ? 'Switched to webSpeech. Browser SpeechSynthesis will play audio directly.'
+          : `Switched to ${engine}. Default URL: ${defaults.apiUrl}`,
     );
     setStatusType('success');
   }, [engine]);
 
-  const fetchSpeakers = async () => {
+  const fetchSpeakers = useCallback(async () => {
     if (
       engine !== 'voicevox' &&
       engine !== 'aivisSpeech' &&
-      engine !== 'minimax' &&
       engine !== 'xai' &&
       engine !== 'elevenLabs' &&
-      engine !== 'inworld'
+      engine !== 'inworld' &&
+      engine !== 'gradium' &&
+      engine !== 'webSpeech'
     ) {
       return;
     }
@@ -519,212 +480,26 @@ function App() {
     setSpeakerFetchError(null);
 
     try {
-      let nextSpeakerOptions: SpeakerOption[] = [];
-
-      if (engine === 'voicevox' || engine === 'aivisSpeech') {
-        const normalizedApiUrl = trimTrailingSlash(apiUrl.trim());
-
-        if (!normalizedApiUrl) {
-          throw new Error('API URL is required');
-        }
-
-        const response = await fetch(`${normalizedApiUrl}/speakers`);
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch speakers: ${response.status} ${response.statusText}`,
-          );
-        }
-
-        const speakers = (await response.json()) as VoicevoxSpeakerResponse[];
-        nextSpeakerOptions = speakers.flatMap((voice) =>
-          voice.styles.map((style) => ({
-            id: String(style.id),
-            label: `${voice.name} - ${style.name}`,
-          })),
-        );
-      } else if (engine === 'xai') {
-        const trimmedApiKey = apiKey.trim();
-
-        if (!trimmedApiKey) {
-          throw new Error('xAI API key is required');
-        }
-
-        const response = await fetch(
-          `${trimTrailingSlash(ENGINE_DEFAULTS.xai.apiUrl)}/voices`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${trimmedApiKey}`,
-            },
-          },
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(
-            errorText
-              ? `Failed to fetch speakers: ${response.status} - ${errorText}`
-              : `Failed to fetch speakers: ${response.status} ${response.statusText}`,
-          );
-        }
-
-        const result = (await response.json()) as XaiVoiceListResponse;
-        nextSpeakerOptions = (result.voices ?? []).map((voice) => ({
-          id: voice.voice_id,
-          label: voice.name,
-        }));
-      } else if (engine === 'elevenLabs') {
-        const trimmedApiKey = apiKey.trim();
-
-        if (!trimmedApiKey) {
-          throw new Error('ElevenLabs API key is required');
-        }
-
-        const response = await fetch(ENGINE_DEFAULTS.elevenLabs.voicesApiUrl, {
-          method: 'GET',
-          headers: {
-            'xi-api-key': trimmedApiKey,
-          },
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(
-            errorText
-              ? `Failed to fetch speakers: ${response.status} - ${errorText}`
-              : `Failed to fetch speakers: ${response.status} ${response.statusText}`,
-          );
-        }
-
-        const result = (await response.json()) as ElevenLabsVoiceListResponse;
-        nextSpeakerOptions = (result.voices ?? []).map((voice) => ({
-          id: voice.voice_id,
-          label: voice.category
-            ? `${voice.name} (${voice.category})`
-            : voice.name,
-        }));
-      } else if (engine === 'inworld') {
-        const trimmedApiKey = apiKey.trim();
-
-        if (!trimmedApiKey) {
-          throw new Error('Inworld API key is required');
-        }
-
-        let pageToken = '';
-        const voices: InworldVoiceResponse[] = [];
-
-        do {
-          const url = new URL(ENGINE_DEFAULTS.inworld.voicesApiUrl);
-          url.searchParams.set('orderBy', 'display_name asc');
-          url.searchParams.set('pageSize', '2000');
-
-          if (inworldVoiceLanguage !== 'all') {
-            url.searchParams.set(
-              'filter',
-              `lang_code = "${inworldVoiceLanguage}"`,
-            );
-          }
-
-          if (pageToken) {
-            url.searchParams.set('pageToken', pageToken);
-          }
-
-          const response = await fetch(url.toString(), {
-            method: 'GET',
-            headers: {
-              Authorization: `Basic ${trimmedApiKey}`,
-            },
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(
-              errorText
-                ? `Failed to fetch speakers: ${response.status} - ${errorText}`
-                : `Failed to fetch speakers: ${response.status} ${response.statusText}`,
-            );
-          }
-
-          const result = (await response.json()) as InworldVoiceListResponse;
-          voices.push(...(result.voices ?? []));
-          pageToken = result.nextPageToken ?? '';
-        } while (pageToken);
-
-        nextSpeakerOptions = voices
-          .sort((a, b) => {
-            const languagePriority =
-              Number(isJapaneseInworldVoice(b)) -
-              Number(isJapaneseInworldVoice(a));
-
-            if (languagePriority !== 0) {
-              return languagePriority;
-            }
-
-            return (a.displayName ?? a.voiceId).localeCompare(
-              b.displayName ?? b.voiceId,
-            );
-          })
-          .map((voice) => {
-            const metadata = [formatInworldLanguage(voice), voice.gender]
-              .filter(Boolean)
-              .join(' / ');
-
-            return {
-              id: voice.voiceId,
-              label: metadata
-                ? `${voice.displayName ?? voice.voiceId} (${metadata})`
-                : (voice.displayName ?? voice.voiceId),
-            };
-          });
-      } else {
-        const trimmedApiKey = apiKey.trim();
-
-        if (!trimmedApiKey) {
-          throw new Error('MiniMax API key is required');
-        }
-
-        const response = await fetch(
-          'https://api.minimax.io/v1/query/tts_speakers',
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${trimmedApiKey}`,
-              'Content-Type': 'application/json',
-            },
-          },
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(
-            errorText
-              ? `Failed to fetch speakers: ${response.status} - ${errorText}`
-              : `Failed to fetch speakers: ${response.status} ${response.statusText}`,
-          );
-        }
-
-        const result = (await response.json()) as MinimaxSpeakerListResponse;
-
-        if (
-          result.base_resp?.status_code !== undefined &&
-          result.base_resp.status_code !== 0
-        ) {
-          const statusMessage = result.base_resp.status_msg ?? 'Unknown error';
-          throw new Error(
-            `MiniMax API error: ${result.base_resp.status_code} - ${statusMessage}`,
-          );
-        }
-
-        nextSpeakerOptions = (result.data?.speakers ?? []).map((voice) => ({
-          id: voice.voice_id,
-          label: voice.gender
-            ? `${voice.voice_name} (${voice.gender})`
-            : voice.voice_name,
-        }));
-      }
+      const voices = await getVoiceEngineVoiceList(engine as VoiceEngineType, {
+        apiKey,
+        apiUrl,
+        language: inworldVoiceLanguage,
+      });
+      const nextSpeakerOptions: SpeakerOption[] = voices.map((voice) => ({
+        id: voice.id,
+        label: voice.label,
+        language: voice.metadata?.language,
+      }));
 
       if (nextSpeakerOptions.length === 0) {
+        if (engine === 'webSpeech') {
+          setSpeakerOptions([]);
+          setSpeaker('');
+          setStatus('No browser voices found. Using browser default voice.');
+          setStatusType('info');
+          return;
+        }
+
         throw new Error('No speakers found');
       }
 
@@ -744,13 +519,19 @@ function App() {
             : String(ENGINE_DEFAULTS.xai.speaker),
         );
       }
-      setSpeakerFetchError(
-        error instanceof Error ? error.message : 'Failed to fetch speakers',
-      );
+      setSpeakerFetchError(formatSpeakerFetchError(error));
     } finally {
       setIsFetchingSpeakers(false);
     }
-  };
+  }, [apiKey, apiUrl, engine, inworldVoiceLanguage]);
+
+  useEffect(() => {
+    if (engine !== 'webSpeech') {
+      return;
+    }
+
+    void fetchSpeakers();
+  }, [engine, fetchSpeakers]);
 
   const speak = async () => {
     if (!text) {
@@ -1516,6 +1297,8 @@ function App() {
               onMinimaxGroupIdChange={setMinimaxGroupId}
               inworldVoiceLanguage={inworldVoiceLanguage}
               onInworldVoiceLanguageChange={changeInworldVoiceLanguage}
+              webSpeechVoiceLanguage={webSpeechVoiceLanguage}
+              onWebSpeechVoiceLanguageChange={changeWebSpeechVoiceLanguage}
               apiKeyIsRequired={apiKeyIsRequired}
               piperPlusAvailable={piperPlusAvailable}
               piperPlusLoading={piperPlusLoading}

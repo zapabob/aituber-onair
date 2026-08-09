@@ -1,5 +1,9 @@
 # VRM Chat
 
+Web Speech API TTS ではブラウザ音声の選択と rate、pitch、volume、language
+を設定できます。ブラウザが直接再生して音声バッファを取得できないため、
+このエンジン選択時はリップシンク非対応です。
+
 ![react-vrm-app image](./images/react-vrm-app.png)
 
 `@aituber-onair/core` を使った VRM アバターチャットアプリです。  
@@ -10,11 +14,15 @@
 
 - LLM プロバイダ切り替え:
   `openai`, `openai-compatible`, `openrouter`, `gemini`, `gemini-nano`,
-  `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`
+  `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`,
+  `sakana`（ブラウザ UI では disabled 表示）, `plamo`
+- xAI Grok 4.5 の `reasoning_effort` は `low`、Grok 4.3 は低レイテンシ向けに `none` がデフォルトです
 - モデル一覧は `@aituber-onair/core` の対応モデルから動的取得するため、
-  Gemini 3.5 Flash や GPT-5.5 など chat 由来の新規モデルも Settings に
+  Gemini 3.6 Flash、Kimi K3、Ministral 3、GLM-5V-Turbo、GPT-5.6 など
+  chat 由来の新規モデルも Settings に
   自動反映されます
-- Gemini 3.5 Flash はチャット用途向けに minimal thinking を自動適用します
+- Gemini 3 Flash 系はチャット用途向けに minimal thinking、Gemini 3 Pro
+  は low をデフォルトで適用します
 - `gpt-5.5-pro` は OpenAI のドキュメント上でストリーミング非対応のため、
   ストリーミング前提の通常チャットフローを使うこの例では含めていません
 - `openrouter` では Settings から現在使える `:free` モデルを取得可能:
@@ -24,7 +32,7 @@
 - TTS エンジン切り替え:
   `openai`, `geminiTts`, `openaiCompatible`, `voicevox`, `voicepeak`,
   `aivisSpeech`, `aivisCloud`, `minimax`, `xai`, `unrealSpeech`,
-  `elevenLabs`, `inworld`, `piperPlus`, `none`
+  `elevenLabs`, `inworld`, `piperPlus`, `webSpeech`, `none`
 - `geminiTts` は `gemini-3.1-flash-tts-preview` を既定利用し、30 種類の
   プリセットボイスとスタイル / audio-tag プロンプト入力に対応
 - スピーカー一覧の動的取得と選択:
@@ -38,14 +46,21 @@
 - `piperPlus` は `public/piper/` 配下に browser assets を配置して利用します
 - VRM アバター（`miko.vrm`）の表示と、任意の VRMA 待機モーション再生
 - VRM 表情（`Aa`）へのリアルタイム口パク反映
+- 応答の感情タグに応じた VRM 表情の適用
+  （読み込んだ VRM にない表情は無視してフォールバック）
+- 発話していない間に、控えめなランダム表情アイドルを自動再生
 - アバターステージのカメラ操作:
   ドラッグで回転 / ホイールでズーム / ダブルクリックでリセット
 - Settings 画面から見た目を設定:
   - 背景画像アップロード（PNG/JPG、メモリ保持のみ）
+  - グリーンバック背景
+  - アバター発話字幕だけを出すソロ配信表示
   - 使用アバターパス表示（`/avatar/miko.vrm`）
 - YouTube Live / Twitch のライブチャットを取得し、`@aituber-onair/comment-intelligence` で分析して、選ばれたコメントだけを LLM パイプラインに流す
   - YouTube は YouTube Data API v3 を利用（Google Cloud の API キーが必要）
   - Twitch は EventSub WebSocket とブラウザ上での implicit OAuth フローを利用
+- **Settings → Screen Vision** から OBS Virtual Camera の1フレームを取得し、
+  Vision 対応モデルに送ってアバターがコメント
 - `@aituber-onair/manneri` で会話の繰り返し傾向を検出し、次の応答前に
   内部的な話題転換指示を追加
 
@@ -59,6 +74,9 @@ npm run dev
 
 起動後に **Settings** を開き、API キーや各種設定を入力してください。  
 設定値は `localStorage`（`react-vrm-app-settings`）に保存されます。
+LLM セクションではシステムプロンプトも編集できます。入力欄からフォーカスが
+外れた時に反映されます。表情連動を利用する場合は、初期値に含まれる emotion
+tag の指示を残してください。
 
 `openai-compatible` 利用時は以下を設定してください。
 - `Endpoint URL`（必須。`/v1/chat/completions` まで含む URL）
@@ -70,6 +88,19 @@ npm run dev
 - `#optimization-guide-on-device-model`
 - `#prompt-api-for-gemini-nano`
 - API Key は不要です
+
+## Screen Vision
+
+OBS Virtual Camera を開始し、**Settings → Screen Vision** で選択してから
+**画面を見る** を押すと、現在のフレームを Vision 対応モデルに送信します。
+30秒、1分、2分、5分ごとの自動送信も選択できます。
+
+## 配信用表示
+
+**Settings → Visual** から背景をグリーンバックに切り替え、表示モードを
+ソロ配信にできます。ソロ配信では通常のチャットログを隠し、アバターの
+最新発話だけを下部字幕として表示します。ユーザー入力欄は初期状態では
+非表示ですが、同じ Visual 設定から表示できます。
 
 ## ライブコメント取得（YouTube Live / Twitch）
 
@@ -199,7 +230,7 @@ public/piper/
 
 | ファイル | 必須 | 説明 |
 |---|---|---|
-| `miko.vrm` | 必須 | ビューアーが読み込む VRM モデル |
+| `miko.vrm` | 必須 | ビューアーが読み込む VRM モデル。このサンプル向けの任意表情プリセットを含みます |
 | `idle_loop.vrma` | 任意 | 待機アニメーションクリップ（なくても動作可能） |
 
 補足:
@@ -210,6 +241,10 @@ public/piper/
 
 `miko.vrm` が未配置または不正な場合、アバターステージに
 ロードエラーを表示します。
+
+同梱モデルには `happy`, `sad`, `surprised`, `mouthSmileLeft`,
+`browInnerUp` などの任意表情が含まれています。別の VRM に差し替えた場合、
+未対応の表情は無視し、利用可能な表情と口パクのみで動作します。
 
 ## 口パクの調整パラメータ
 
@@ -235,3 +270,11 @@ public/piper/
 - `three`, `@pixiv/three-vrm`, `@pixiv/three-vrm-animation`
 - Web Speech API（音声入力）
 - Web Audio API + `AnalyserNode`（口パク解析）
+
+## 同梱ミコ素材の利用条件
+
+デフォルトVRMモデルは、AITuber OnAir公式キャラクター「ミコ」の素材であり、
+ソフトウェアのMIT License対象外です。作品・コンテンツの一部として一体で
+再配布できますが、素材単体・素材集としての再配布は禁止されています。
+正式版である日本語ガイドラインについては
+[Miko Asset Terms](./MIKO_ASSET_TERMS.md)を参照してください。

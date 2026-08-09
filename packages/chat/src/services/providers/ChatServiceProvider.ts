@@ -1,6 +1,13 @@
 import { ChatService } from '../ChatService';
 import { ChatResponseLength, GPT5PresetKey } from '../../constants/chat';
+import type { GeminiReasoningEffort } from '../../constants/gemini';
+import type { ClaudeReasoningEffort } from '../../constants/claude';
 import type { MistralReasoningEffort } from '../../constants/mistral';
+import type { PlamoReasoningEffort } from '../../constants/plamo';
+import type { XaiReasoningEffort } from '../../constants/xai';
+import type { KimiReasoningEffort } from '../../constants/kimi';
+import type { DeepSeekReasoningEffort } from '../../constants/deepseek';
+import type { OpenRouterReasoningEffort } from '../../constants/openrouter';
 import { ToolDefinition, MCPServerConfig } from '../../types';
 
 /**
@@ -15,14 +22,21 @@ export interface BaseChatServiceOptions {
   visionModel?: string;
   /** API endpoint URL (OpenAI-compatible full URL) */
   endpoint?: string;
-  /** Base URL for OpenAI-compatible APIs (Kimi/DeepSeek/Mistral only) */
+  /** Base URL for OpenAI-compatible APIs */
   baseUrl?: string;
   /** Response length setting */
   responseLength?: ChatResponseLength;
   /** Verbosity level for GPT-5 models (OpenAI only) */
   verbosity?: 'low' | 'medium' | 'high';
-  /** Reasoning effort level for GPT-5 models (OpenAI) and gpt-oss models (OpenRouter) */
-  reasoning_effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  /** Reasoning effort level for reasoning-capable providers */
+  reasoning_effort?:
+    | 'none'
+    | 'minimal'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'xhigh'
+    | 'max';
   /** GPT-5 usage preset (OpenAI only) - overrides individual reasoning/verbosity settings */
   gpt5Preset?: GPT5PresetKey;
   /** GPT-5 endpoint preference (OpenAI only) - 'chat' for Chat Completions API, 'responses' for Responses API, 'auto' for automatic selection */
@@ -78,7 +92,7 @@ export type OpenRouterChatServiceOptions = DisallowKeys<
   | 'thinking'
   | 'responseFormat'
 > & {
-  reasoning_effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+  reasoning_effort?: OpenRouterReasoningEffort;
   appName?: string;
   appUrl?: string;
 };
@@ -88,7 +102,6 @@ export type GeminiChatServiceOptions = DisallowKeys<
   | 'endpoint'
   | 'baseUrl'
   | 'verbosity'
-  | 'reasoning_effort'
   | 'gpt5Preset'
   | 'gpt5EndpointPreference'
   | 'enableReasoningSummary'
@@ -97,49 +110,65 @@ export type GeminiChatServiceOptions = DisallowKeys<
   | 'responseFormat'
   | 'thinking'
 > & {
+  /** Gemini 3 thinking level. Defaults to the lowest supported effort. */
+  reasoning_effort?: GeminiReasoningEffort;
   mcpServers?: MCPServerConfig[];
 };
 
-export type ClaudeChatServiceOptions = DisallowKeys<
-  BaseChatServiceOptions,
-  | 'endpoint'
-  | 'baseUrl'
-  | 'verbosity'
-  | 'reasoning_effort'
-  | 'gpt5Preset'
-  | 'gpt5EndpointPreference'
-  | 'enableReasoningSummary'
-  | 'includeReasoning'
-  | 'reasoningMaxTokens'
-  | 'responseFormat'
-  | 'thinking'
+export type ClaudeChatServiceOptions = Omit<
+  DisallowKeys<
+    BaseChatServiceOptions,
+    | 'endpoint'
+    | 'baseUrl'
+    | 'verbosity'
+    | 'gpt5Preset'
+    | 'gpt5EndpointPreference'
+    | 'enableReasoningSummary'
+    | 'includeReasoning'
+    | 'reasoningMaxTokens'
+    | 'responseFormat'
+    | 'thinking'
+  >,
+  'reasoning_effort'
 > & {
+  /** Claude output effort, mapped to output_config.effort. */
+  reasoning_effort?: ClaudeReasoningEffort;
   mcpServers?: MCPServerConfig[];
 };
 
-export type KimiChatServiceOptions = DisallowKeys<
-  BaseChatServiceOptions,
-  | 'verbosity'
-  | 'reasoning_effort'
-  | 'gpt5Preset'
-  | 'gpt5EndpointPreference'
-  | 'enableReasoningSummary'
-  | 'includeReasoning'
-  | 'reasoningMaxTokens'
->;
+export type KimiChatServiceOptions = Omit<
+  DisallowKeys<
+    BaseChatServiceOptions,
+    | 'verbosity'
+    | 'gpt5Preset'
+    | 'gpt5EndpointPreference'
+    | 'enableReasoningSummary'
+    | 'includeReasoning'
+    | 'reasoningMaxTokens'
+  >,
+  'reasoning_effort'
+> & {
+  /** Kimi K3 reasoning effort. Defaults to max. */
+  reasoning_effort?: KimiReasoningEffort;
+};
 
-export type DeepSeekChatServiceOptions = DisallowKeys<
-  BaseChatServiceOptions,
-  | 'verbosity'
-  | 'reasoning_effort'
-  | 'gpt5Preset'
-  | 'gpt5EndpointPreference'
-  | 'enableReasoningSummary'
-  | 'includeReasoning'
-  | 'reasoningMaxTokens'
-  | 'thinking'
-  | 'responseFormat'
->;
+export type DeepSeekChatServiceOptions = Omit<
+  DisallowKeys<
+    BaseChatServiceOptions,
+    | 'verbosity'
+    | 'gpt5Preset'
+    | 'gpt5EndpointPreference'
+    | 'enableReasoningSummary'
+    | 'includeReasoning'
+    | 'reasoningMaxTokens'
+    | 'thinking'
+    | 'responseFormat'
+  >,
+  'reasoning_effort'
+> & {
+  /** DeepSeek thinking effort. Defaults to none for responsive chat. */
+  reasoning_effort?: DeepSeekReasoningEffort;
+};
 
 export type MistralChatServiceOptions = Omit<
   DisallowKeys<
@@ -159,6 +188,37 @@ export type MistralChatServiceOptions = Omit<
   reasoning_effort?: MistralReasoningEffort;
 };
 
+export type SakanaChatServiceOptions = DisallowKeys<
+  BaseChatServiceOptions,
+  | 'verbosity'
+  | 'reasoning_effort'
+  | 'gpt5Preset'
+  | 'gpt5EndpointPreference'
+  | 'enableReasoningSummary'
+  | 'includeReasoning'
+  | 'reasoningMaxTokens'
+  | 'thinking'
+  | 'responseFormat'
+>;
+
+export type PlamoChatServiceOptions = Omit<
+  DisallowKeys<
+    BaseChatServiceOptions,
+    | 'verbosity'
+    | 'gpt5Preset'
+    | 'gpt5EndpointPreference'
+    | 'enableReasoningSummary'
+    | 'includeReasoning'
+    | 'reasoningMaxTokens'
+    | 'thinking'
+    | 'responseFormat'
+  >,
+  'reasoning_effort'
+> & {
+  /** PLaMo supports none or medium reasoning effort on reasoning-capable models. */
+  reasoning_effort?: PlamoReasoningEffort;
+};
+
 export type ZAIChatServiceOptions = DisallowKeys<
   BaseChatServiceOptions,
   | 'verbosity'
@@ -174,7 +234,6 @@ export type ZAIChatServiceOptions = DisallowKeys<
 export type XAIChatServiceOptions = DisallowKeys<
   BaseChatServiceOptions,
   | 'verbosity'
-  | 'reasoning_effort'
   | 'gpt5Preset'
   | 'gpt5EndpointPreference'
   | 'enableReasoningSummary'
@@ -183,7 +242,15 @@ export type XAIChatServiceOptions = DisallowKeys<
   | 'baseUrl'
   | 'thinking'
   | 'responseFormat'
->;
+> & {
+  /** xAI reasoning effort. Only sent for models that support it. */
+  reasoning_effort?: XaiReasoningEffort;
+};
+
+export type GeminiNanoInitialPrompt = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
 
 export type GeminiNanoChatServiceOptions = {
   /** API Key is not needed for Gemini Nano (browser built-in AI) */
@@ -192,7 +259,12 @@ export type GeminiNanoChatServiceOptions = {
   model?: string;
   /** Response length setting */
   responseLength?: ChatResponseLength;
-  /** Expected input languages for the Prompt API (default: ['ja']) */
+  /**
+   * Initial system instructions and few-shot examples for the Prompt API.
+   * System prompts are normalized to the first entry before session creation.
+   */
+  initialPrompts?: GeminiNanoInitialPrompt[];
+  /** Expected input languages for the Prompt API (default: ['ja', 'en']) */
   expectedInputLanguages?: string[];
   /** Expected output languages for the Prompt API (default: ['ja']) */
   expectedOutputLanguages?: string[];
@@ -213,6 +285,8 @@ export type ChatServiceOptionsByProvider = {
   kimi: KimiChatServiceOptions;
   deepseek: DeepSeekChatServiceOptions;
   mistral: MistralChatServiceOptions;
+  sakana: SakanaChatServiceOptions;
+  plamo: PlamoChatServiceOptions;
   'gemini-nano': GeminiNanoChatServiceOptions;
 };
 

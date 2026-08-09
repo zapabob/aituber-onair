@@ -1,9 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AITuberOnAirCore,
+  getDefaultXaiReasoningEffort,
   refreshOpenRouterFreeModels,
   type RefreshOpenRouterFreeModelsResult,
+  type XaiReasoningEffort,
 } from '@aituber-onair/core';
+import { DEFAULT_SYSTEM_PROMPT } from '../constants/prompts';
+import {
+  normalizeEmotionEffectAnchor,
+  normalizeEmotionEffectAnchors,
+  type EmotionEffectAnchor,
+} from '../lib/emotionEffectAnchor';
+import {
+  DEFAULT_VRM_EMOTION_EFFECT_MAP,
+  isVrmReactionControlMode,
+  normalizeVrmEmotionEffectMap,
+  type VrmEmotionEffect,
+  type VrmReactionControlMode,
+  type VrmReactionEmotion,
+} from '../lib/vrmReactions';
 import type {
   AppSettings,
   ChatProviderOption,
@@ -42,6 +58,8 @@ const DEFAULT_PIPER_PLUS_MODEL_FILE = 'tsukuyomi-wavlm-300epoch.onnx';
 const DEFAULT_PIPER_PLUS_VOICE_FILE = 'mei_normal.htsvoice';
 const DEFAULT_OPENROUTER_MAX_CANDIDATES = 1;
 const DEFAULT_OPENROUTER_MAX_WORKING = 10;
+const DEFAULT_SCREEN_VISION_PROMPT =
+  'OBS仮想カメラの画面を見て、配信者として短く自然にコメントしてください。';
 const EMPTY_MODEL_IDS: string[] = [];
 
 function getOrderedModels(provider: ChatProviderOption): string[] {
@@ -115,7 +133,9 @@ function getDefaultSettings(): AppSettings {
     llm: {
       provider: 'openai',
       model: 'gpt-4.1-nano',
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
       endpoint: DEFAULT_OPENAI_COMPATIBLE_ENDPOINT,
+      xaiReasoningEffort: 'none',
       apiKeys: {
         openai: '',
         'openai-compatible': '',
@@ -127,6 +147,8 @@ function getDefaultSettings(): AppSettings {
         xai: '',
         deepseek: '',
         mistral: '',
+        sakana: '',
+        plamo: '',
       },
       openRouterDynamicFreeModels: {
         models: [],
@@ -196,6 +218,24 @@ function getDefaultSettings(): AppSettings {
       piperPlusVoiceFile: DEFAULT_PIPER_PLUS_VOICE_FILE,
       piperPlusSpeed: '',
       piperPlusNoiseScale: '',
+      webSpeechRate: '1',
+      webSpeechPitch: '1',
+      webSpeechVolume: '1',
+      webSpeechLanguage: 'ja-JP',
+    },
+    visual: {
+      backgroundMode: 'default',
+      layoutMode: 'chat',
+      showInputInBroadcast: false,
+      vrmEmotionEffectAnchors: {},
+      vrmReactionControlMode: 'none',
+      vrmEmotionEffectMap: { ...DEFAULT_VRM_EMOTION_EFFECT_MAP },
+    },
+    screenVision: {
+      deviceId: '',
+      prompt: DEFAULT_SCREEN_VISION_PROMPT,
+      autoIntervalMs: 0,
+      enabled: false,
     },
     stream: {
       platform: 'none',
@@ -213,6 +253,9 @@ function getDefaultSettings(): AppSettings {
       enabled: true,
       mode: 'rules',
       useSameLLMSettings: true,
+      streamTopic: '',
+      streamTitle: '',
+      topicFilter: 'prefer',
       maxCommentsPerBatch: 50,
       analysisIntervalMs: 1000,
       minCommentsForLLMAnalysis: 8,
@@ -245,6 +288,22 @@ function loadSettings(): AppSettings {
           ),
         },
         tts: { ...defaults.tts, ...saved.tts },
+        visual: {
+          ...defaults.visual,
+          ...saved.visual,
+          vrmEmotionEffectAnchors: normalizeEmotionEffectAnchors(
+            saved.visual?.vrmEmotionEffectAnchors,
+          ),
+          vrmReactionControlMode: isVrmReactionControlMode(
+            saved.visual?.vrmReactionControlMode,
+          )
+            ? saved.visual.vrmReactionControlMode
+            : defaults.visual.vrmReactionControlMode,
+          vrmEmotionEffectMap: normalizeVrmEmotionEffectMap(
+            saved.visual?.vrmEmotionEffectMap,
+          ),
+        },
+        screenVision: { ...defaults.screenVision, ...saved.screenVision },
         stream: { ...defaults.stream, ...saved.stream },
         commentIntelligence: {
           ...defaults.commentIntelligence,
@@ -311,6 +370,10 @@ export function useSettings() {
           ...prev.llm,
           provider,
           model: nextModel,
+          xaiReasoningEffort:
+            provider === 'xai'
+              ? getDefaultXaiReasoningEffort(nextModel) || 'none'
+              : prev.llm.xaiReasoningEffort,
           endpoint:
             provider === 'openai-compatible'
               ? prev.llm.endpoint || DEFAULT_OPENAI_COMPATIBLE_ENDPOINT
@@ -324,9 +387,33 @@ export function useSettings() {
   const updateLLMModel = useCallback((model: string) => {
     setSettings((prev) => ({
       ...prev,
-      llm: { ...prev.llm, model },
+      llm: {
+        ...prev.llm,
+        model,
+        xaiReasoningEffort:
+          prev.llm.provider === 'xai'
+            ? getDefaultXaiReasoningEffort(model) || 'none'
+            : prev.llm.xaiReasoningEffort,
+      },
     }));
   }, []);
+
+  const updateLLMSystemPrompt = useCallback((systemPrompt: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      llm: { ...prev.llm, systemPrompt },
+    }));
+  }, []);
+
+  const updateXaiReasoningEffort = useCallback(
+    (xaiReasoningEffort: XaiReasoningEffort) => {
+      setSettings((prev) => ({
+        ...prev,
+        llm: { ...prev.llm, xaiReasoningEffort },
+      }));
+    },
+    [],
+  );
 
   const updateLLMApiKey = useCallback(
     (provider: ChatProviderOption, key: string) => {
@@ -439,6 +526,7 @@ export function useSettings() {
       inworld: '',
       gradium: 'YTpq7expH9539ERJ',
       piperPlus: 'default',
+      webSpeech: '',
       none: '',
     };
     setSettings((prev) => ({
@@ -814,6 +902,135 @@ export function useSettings() {
     }));
   }, []);
 
+  const updateVisualBackgroundMode = useCallback(
+    (backgroundMode: AppSettings['visual']['backgroundMode']) => {
+      setSettings((prev) => ({
+        ...prev,
+        visual: { ...prev.visual, backgroundMode },
+      }));
+    },
+    [],
+  );
+
+  const updateVisualLayoutMode = useCallback(
+    (layoutMode: AppSettings['visual']['layoutMode']) => {
+      setSettings((prev) => ({
+        ...prev,
+        visual: { ...prev.visual, layoutMode },
+      }));
+    },
+    [],
+  );
+
+  const updateVisualShowInputInBroadcast = useCallback(
+    (showInputInBroadcast: boolean) => {
+      setSettings((prev) => ({
+        ...prev,
+        visual: { ...prev.visual, showInputInBroadcast },
+      }));
+    },
+    [],
+  );
+
+  const updateVisualVrmReactionControlMode = useCallback(
+    (vrmReactionControlMode: VrmReactionControlMode) => {
+      setSettings((prev) => ({
+        ...prev,
+        visual: { ...prev.visual, vrmReactionControlMode },
+      }));
+    },
+    [],
+  );
+
+  const updateVisualVrmEmotionEffect = useCallback(
+    (emotion: VrmReactionEmotion, effect: VrmEmotionEffect | null) => {
+      setSettings((prev) => ({
+        ...prev,
+        visual: {
+          ...prev.visual,
+          vrmEmotionEffectMap: {
+            ...prev.visual.vrmEmotionEffectMap,
+            [emotion]: effect,
+          },
+        },
+      }));
+    },
+    [],
+  );
+
+  const resetVisualVrmEmotionEffectMap = useCallback(() => {
+    setSettings((prev) => ({
+      ...prev,
+      visual: {
+        ...prev.visual,
+        vrmEmotionEffectMap: { ...DEFAULT_VRM_EMOTION_EFFECT_MAP },
+      },
+    }));
+  }, []);
+
+  const updateVisualVrmEmotionEffectAnchor = useCallback(
+    (profileId: string, anchor: EmotionEffectAnchor) => {
+      if (!profileId) return;
+      const normalized = normalizeEmotionEffectAnchor(anchor);
+      setSettings((prev) => ({
+        ...prev,
+        visual: {
+          ...prev.visual,
+          vrmEmotionEffectAnchors: Object.fromEntries(
+            Object.entries({
+              ...prev.visual.vrmEmotionEffectAnchors,
+              [profileId]: normalized,
+            }).slice(-24),
+          ),
+        },
+      }));
+    },
+    [],
+  );
+
+  const resetVisualVrmEmotionEffectAnchor = useCallback((profileId: string) => {
+    if (!profileId) return;
+    setSettings((prev) => {
+      const remaining = { ...prev.visual.vrmEmotionEffectAnchors };
+      delete remaining[profileId];
+      return {
+        ...prev,
+        visual: { ...prev.visual, vrmEmotionEffectAnchors: remaining },
+      };
+    });
+  }, []);
+
+  const updateScreenVisionDeviceId = useCallback((deviceId: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      screenVision: { ...prev.screenVision, deviceId },
+    }));
+  }, []);
+
+  const updateScreenVisionPrompt = useCallback((prompt: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      screenVision: { ...prev.screenVision, prompt },
+    }));
+  }, []);
+
+  const updateScreenVisionAutoIntervalMs = useCallback(
+    (autoIntervalMs: number) => {
+      setSettings((prev) => ({
+        ...prev,
+        screenVision: { ...prev.screenVision, autoIntervalMs },
+      }));
+    },
+    [],
+  );
+
+  const updateScreenVisionEnabled = useCallback((enabled: boolean) => {
+    setSettings((prev) => ({
+      ...prev,
+      screenVision: { ...prev.screenVision, enabled },
+    }));
+  }, []);
+
   const updateStreamPlatform = useCallback(
     (platform: StreamingPlatformOption) => {
       setSettings((prev) => ({
@@ -910,6 +1127,36 @@ export function useSettings() {
     [],
   );
 
+  const updateCommentIntelligenceStreamTopic = useCallback(
+    (streamTopic: string) => {
+      setSettings((prev) => ({
+        ...prev,
+        commentIntelligence: { ...prev.commentIntelligence, streamTopic },
+      }));
+    },
+    [],
+  );
+
+  const updateCommentIntelligenceStreamTitle = useCallback(
+    (streamTitle: string) => {
+      setSettings((prev) => ({
+        ...prev,
+        commentIntelligence: { ...prev.commentIntelligence, streamTitle },
+      }));
+    },
+    [],
+  );
+
+  const updateCommentIntelligenceTopicFilter = useCallback(
+    (topicFilter: AppSettings['commentIntelligence']['topicFilter']) => {
+      setSettings((prev) => ({
+        ...prev,
+        commentIntelligence: { ...prev.commentIntelligence, topicFilter },
+      }));
+    },
+    [],
+  );
+
   const updateCommentIntelligenceAnalysisIntervalMs = useCallback(
     (analysisIntervalMs: number) => {
       setSettings((prev) => ({
@@ -1000,10 +1247,7 @@ export function useSettings() {
         ...prev,
         manneri: {
           ...prev.manneri,
-          similarityThreshold: Math.min(
-            1,
-            Math.max(0.1, similarityThreshold),
-          ),
+          similarityThreshold: Math.min(1, Math.max(0.1, similarityThreshold)),
         },
       }));
     },
@@ -1070,8 +1314,10 @@ export function useSettings() {
     availableModels,
     updateLLMProvider,
     updateLLMModel,
+    updateLLMSystemPrompt,
     updateLLMApiKey,
     updateLLMEndpoint,
+    updateXaiReasoningEffort,
     refreshOpenRouterDynamicFreeModels,
     isRefreshingOpenRouterFreeModels,
     openRouterRefreshError,
@@ -1105,6 +1351,18 @@ export function useSettings() {
     updatePiperPlusVoiceFile,
     updatePiperPlusSpeed,
     updatePiperPlusNoiseScale,
+    updateVisualBackgroundMode,
+    updateVisualLayoutMode,
+    updateVisualShowInputInBroadcast,
+    updateVisualVrmReactionControlMode,
+    updateVisualVrmEmotionEffect,
+    resetVisualVrmEmotionEffectMap,
+    updateVisualVrmEmotionEffectAnchor,
+    resetVisualVrmEmotionEffectAnchor,
+    updateScreenVisionDeviceId,
+    updateScreenVisionPrompt,
+    updateScreenVisionAutoIntervalMs,
+    updateScreenVisionEnabled,
     updateStreamPlatform,
     updateYoutubeApiKey,
     updateYoutubeLiveId,
@@ -1117,6 +1375,9 @@ export function useSettings() {
     updateTwitchCommentIntervalMs,
     updateCommentIntelligenceEnabled,
     updateCommentIntelligenceMode,
+    updateCommentIntelligenceStreamTopic,
+    updateCommentIntelligenceStreamTitle,
+    updateCommentIntelligenceTopicFilter,
     updateCommentIntelligenceAnalysisIntervalMs,
     updateCommentIntelligenceMaxCommentsPerBatch,
     updateCommentIntelligenceMinCommentsForLLMAnalysis,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { rankComments } from '../src/ranking/rankComments';
-import type { LiveComment } from '../src/types/comment';
-import type { SafetyReport } from '../src/types/safety';
-import type { ViewerProfile } from '../src/types/viewer';
+import { rankComments } from '../src/ranking/rankComments.js';
+import type { LiveComment } from '../src/types/comment.js';
+import type { SafetyReport } from '../src/types/safety.js';
+import type { ViewerProfile } from '../src/types/viewer.js';
 
 function comment(
   id: string,
@@ -102,6 +102,78 @@ describe('rankComments', () => {
     expect(result.rankedComments[0].reasons).toContain('topic_related');
   });
 
+  it('requires topic-related comments when topicFilter is require', () => {
+    const result = rankComments({
+      comments: [
+        comment('question', '晩ごはんなに？'),
+        comment('topic', '今日は音楽制作の続き？'),
+      ],
+      safetyReports: [],
+      streamState: { topic: '音楽制作', language: 'ja' },
+      config: { topicFilter: 'require', maxSelectedComments: 2 },
+    });
+
+    expect(result.selectedComments.map((selected) => selected.id)).toEqual([
+      'topic',
+    ]);
+    const question = result.rankedComments.find(
+      (ranked) => ranked.id === 'question'
+    );
+    expect(question?.reasons).toContain('topic_unrelated');
+  });
+
+  it('does not filter by topic when topicFilter is require but topic is unset', () => {
+    const result = rankComments({
+      comments: [comment('question', '晩ごはんなに？')],
+      safetyReports: [],
+      streamState: { language: 'ja' },
+      config: { topicFilter: 'require', maxSelectedComments: 2 },
+    });
+
+    expect(result.selectedComments.map((selected) => selected.id)).toEqual([
+      'question',
+    ]);
+  });
+
+  it('treats a whitespace-only topic as unset under require', () => {
+    const result = rankComments({
+      comments: [comment('question', '晩ごはんなに？')],
+      safetyReports: [],
+      streamState: { topic: '   ', language: 'ja' },
+      config: { topicFilter: 'require', maxSelectedComments: 2 },
+    });
+
+    expect(result.selectedComments[0].id).toBe('question');
+  });
+
+  it('keeps previous selection behavior when topicFilter is prefer', () => {
+    const result = rankComments({
+      comments: [comment('question', '晩ごはんなに？')],
+      safetyReports: [],
+      streamState: { topic: '音楽制作', language: 'ja' },
+      config: { topicFilter: 'prefer' },
+    });
+
+    expect(result.selectedComments[0].id).toBe('question');
+  });
+
+  it('does not boost topic relevance when topicFilter is off', () => {
+    const result = rankComments({
+      comments: [
+        comment('plain', 'こんにちは', 'plain', 1),
+        comment('topic', '音楽制作だね', 'topic', 1),
+      ],
+      safetyReports: [],
+      streamState: { topic: '音楽制作', language: 'ja' },
+      config: { topicFilter: 'off', weights: { freshness: 0, novelty: 0 } },
+    });
+
+    const plain = result.rankedComments.find((ranked) => ranked.id === 'plain');
+    const topic = result.rankedComments.find((ranked) => ranked.id === 'topic');
+    expect(topic?.scoreBreakdown.topicRelevance).toBe(1);
+    expect(topic?.score).toBe(plain?.score);
+  });
+
   it('strongly lowers unsafe comments with chaos-resistant strategy', () => {
     const result = rankComments({
       comments: [
@@ -160,5 +232,100 @@ describe('rankComments', () => {
 
     expect(result.rankedComments[1].reasons).toContain('duplicate');
     expect(result.rankedComments[1].scoreBreakdown.penalty).toBeGreaterThan(0);
+  });
+
+  it('deprioritizes answered comments and marks them ignored_recently', () => {
+    const result = rankComments({
+      comments: [
+        comment('answered', '今日なにするの？', 'viewer-1', 1),
+        comment('fresh', 'どうやるの？', 'viewer-2', 1),
+      ],
+      safetyReports: [],
+      answeredStates: [{ commentId: 'answered', answeredAt: Date.now() }],
+      config: {
+        answeredMemory: { enabled: true, mode: 'deprioritize' },
+      },
+    });
+
+    expect(result.selectedComments[0].id).toBe('fresh');
+    const answered = result.rankedComments.find(
+      (ranked) => ranked.id === 'answered'
+    );
+    expect(answered?.reasons).toContain('ignored_recently');
+    expect(answered?.scoreBreakdown.novelty).toBe(0);
+    expect(answered?.scoreBreakdown.freshness).toBe(0);
+    expect(answered?.scoreBreakdown.penalty).toBeGreaterThan(0);
+  });
+
+  it('keeps answered comments ranked but excludes them from selection', () => {
+    const result = rankComments({
+      comments: [
+        comment('answered', '今日なにするの？', 'viewer-1', 1),
+        comment('fallback', 'こんにちは', 'viewer-2', 1),
+      ],
+      safetyReports: [],
+      answeredStates: [{ commentId: 'answered', answeredAt: Date.now() }],
+      config: {
+        answeredMemory: { enabled: true, mode: 'exclude' },
+      },
+    });
+
+    expect(result.rankedComments.map((ranked) => ranked.id)).toContain(
+      'answered'
+    );
+    expect(
+      result.selectedComments.map((selected) => selected.id)
+    ).not.toContain('answered');
+  });
+
+  it('deprioritizes comments from answered viewers when dedupeByViewer is enabled', () => {
+    const result = rankComments({
+      comments: [
+        comment('same-viewer', '今日なにするの？', 'viewer-1', 1),
+        comment('other-viewer', 'どうやるの？', 'viewer-2', 1),
+      ],
+      safetyReports: [],
+      answeredStates: [
+        {
+          commentId: 'old-comment',
+          authorId: 'viewer-1',
+          answeredAt: Date.now(),
+        },
+      ],
+      config: {
+        answeredMemory: {
+          enabled: true,
+          mode: 'deprioritize',
+          dedupeByViewer: true,
+        },
+      },
+    });
+
+    expect(result.selectedComments[0].id).toBe('other-viewer');
+    expect(
+      result.rankedComments.find((ranked) => ranked.id === 'same-viewer')
+        ?.reasons
+    ).toContain('ignored_recently');
+  });
+
+  it('does not change ranking when answered memory is empty', () => {
+    const comments = [
+      comment('greeting', 'こんにちは', 'viewer-1', 1),
+      comment('question', '今日なにするの？', 'viewer-2', 1),
+    ];
+    const baseline = rankComments({ comments, safetyReports: [] });
+    const withEmptyAnswered = rankComments({
+      comments,
+      safetyReports: [],
+      answeredStates: [],
+      config: { answeredMemory: { enabled: true } },
+    });
+
+    expect(withEmptyAnswered.rankedComments.map((ranked) => ranked.id)).toEqual(
+      baseline.rankedComments.map((ranked) => ranked.id)
+    );
+    expect(
+      withEmptyAnswered.selectedComments.map((selected) => selected.id)
+    ).toEqual(baseline.selectedComments.map((selected) => selected.id));
   });
 });

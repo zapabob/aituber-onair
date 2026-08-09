@@ -22,7 +22,7 @@ export interface GeminiNanoState {
 }
 
 const MODEL_IO = {
-  expectedInputs: [{ type: 'text', languages: ['ja'] }],
+  expectedInputs: [{ type: 'text', languages: ['ja', 'en'] }],
   expectedOutputs: [{ type: 'text', languages: ['ja'] }],
 };
 
@@ -62,7 +62,7 @@ export function useGeminiNanoStatus(enabled: boolean): GeminiNanoState {
         if (!cancelled) {
           setStatus('unavailable');
           setStatusText(
-            'Built-in AI is not available. Chrome 138+ with flags enabled is required.',
+            'Built-in AI is not available. Chrome 148+ on a supported desktop device is required.',
           );
         }
         return;
@@ -88,7 +88,7 @@ export function useGeminiNanoStatus(enabled: boolean): GeminiNanoState {
         } else {
           setStatus('unavailable');
           setStatusText(
-            'Built-in AI is not available. Chrome 138+ with flags enabled is required.',
+            'Built-in AI is not available. Chrome 148+ on a supported desktop device is required.',
           );
         }
       } catch {
@@ -119,7 +119,9 @@ export function useGeminiNanoStatus(enabled: boolean): GeminiNanoState {
 
     lm.create({
       ...MODEL_IO,
-      systemPrompt: 'You are a helpful assistant.',
+      initialPrompts: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+      ],
       monitor: (m: {
         addEventListener(
           event: string,

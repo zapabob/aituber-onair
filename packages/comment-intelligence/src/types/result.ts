@@ -1,10 +1,10 @@
-import type { LiveComment } from './comment';
-import type { CommentAnalysisMode } from './config';
-import type { RecentAiMessage, StreamState } from './context';
-import type { RankedComment } from './ranking';
-import type { SafetyReport } from './safety';
-import type { IgnoredCommentsSummary } from './summary';
-import type { ViewerProfile } from './viewer';
+import type { LiveComment } from './comment.js';
+import type { CommentAnalysisMode } from './config.js';
+import type { RecentAiMessage, StreamState } from './context.js';
+import type { RankedComment } from './ranking.js';
+import type { SafetyReport } from './safety.js';
+import type { IgnoredCommentsSummary } from './summary.js';
+import type { ViewerProfile } from './viewer.js';
 
 export type CommentIntelligenceDebugInfo = {
   mode: CommentAnalysisMode;
@@ -12,6 +12,7 @@ export type CommentIntelligenceDebugInfo = {
   analyzedCommentCount: number;
   selectedCommentIds: string[];
   blockedViewerIds?: string[];
+  llmUnmatchedIds: string[];
 };
 
 export type CommentIntelligenceResult = {
@@ -22,6 +23,7 @@ export type CommentIntelligenceResult = {
   safetyReports: SafetyReport[];
   contextForLLM: string[];
   instructionForLLM: string;
+  answeredCommentIds?: string[];
   debug?: CommentIntelligenceDebugInfo;
 };
 
@@ -29,7 +31,9 @@ export type AnalyzeCommentsInput = {
   comments: LiveComment[];
   recentMessages?: RecentAiMessage[];
   recentAiMessages?: RecentAiMessage[];
+  answeredCommentIds?: string[];
+  answeredViewerIds?: string[];
   viewerProfiles?: ViewerProfile[];
   streamState?: StreamState;
-  options?: Partial<import('./config').CommentIntelligenceConfig>;
+  options?: Partial<import('./config.js').CommentIntelligenceConfig>;
 };

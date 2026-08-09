@@ -1,5 +1,204 @@
 # @aituber-onair/chat
 
+## 0.50.0
+
+### Minor Changes
+
+- Added model-aware DeepSeek thinking controls for the official
+  `deepseek-v4-flash` and `deepseek-v4-pro` Chat Completions models. Thinking
+  now defaults to `reasoning_effort: 'none'` for responsive chat, while
+  supported higher efforts remain selectable. Thinking with tool calling is
+  rejected until DeepSeek `reasoning_content` replay is supported.
+- Added the text-only OpenRouter models `deepseek/deepseek-v4-flash-0731` and
+  `deepseek/deepseek-v4-flash` as explicit options with model-aware reasoning
+  efforts. OpenRouter `none` now sends `reasoning.effort: 'none'` so reasoning
+  is disabled instead of only hidden with `exclude: true`.
+
+### Patch Changes
+
+- Added a browser-only Gemini Nano customer-support example with EN/JA
+  selection, Enter-to-send with IME-safe newline handling, concise replies,
+  built-in model preparation, and the server example's complete public support
+  knowledge. Updated Prompt API guidance for stable web support in Chrome 148+
+  without flags, while retaining Chrome 138+ guidance for extensions.
+
+## 0.49.0
+
+### Minor Changes
+
+- Expanded curated OpenRouter support with `openrouter/auto-beta`,
+  `moonshotai/kimi-k3`, KAT-Coder Air/Pro V2.5, OpenAI GPT-5.6 Sol/Terra/Luna,
+  Claude Opus 5, Gemini 3.6 Flash/3.5 Flash-Lite, and xAI Grok Latest/4.5.
+  These are explicit options and do not change the existing default model.
+- Added Claude Opus 5 (`claude-opus-5`) as an explicit Claude model with
+  vision support, while keeping Claude Haiku 4.5 as the default.
+- Added model-aware Claude `reasoning_effort` support through Anthropic's
+  `output_config.effort`, including a configurable effort control in the React
+  basic example.
+- Expanded model-aware Kimi `reasoning_effort` support for models that expose
+  the top-level Chat Completions option. Kimi K3 now accepts `low`, `high`, and
+  `max`, keeps `max` as the default, and exposes all three levels in the React
+  basic example.
+
+### Patch Changes
+
+- Prevented blank Auto Router responses by omitting `responseLength`-derived
+  token limits for `openrouter/auto` and `openrouter/auto-beta`, surfacing API
+  errors, and rejecting empty or whitespace-only streaming, tool, and one-shot
+  responses. Explicit `maxTokens` values and directly selected model behavior
+  remain unchanged.
+- Preserved Claude provider-native thinking and tool-use blocks in
+  `completion.assistant_message` so Claude 5 multi-turn tool continuations can
+  return signed thinking blocks unchanged to the Messages API.
+- Improved Gemini Nano character-chat responses by passing system
+  instructions, optional few-shot examples, and recent conversation history
+  through role-preserving Prompt API `initialPrompts`.
+- Added concrete Gemini Nano response-length guidance for `veryShort`,
+  `short`, `medium`, `long`, and `veryLong`, while keeping `deep` unrestricted
+  by sentence count. The React basic example reinforces short presets with
+  concise Japanese examples.
+- Recreate Gemini Nano sessions with the latest configuration and prevent
+  message submission while the browser model is still preparing in the React
+  basic example.
+- Documented English and Japanese usage tips for improving response-length
+  consistency with character-appropriate examples.
+
+## 0.48.0
+
+### Minor Changes
+
+- Added model-aware Gemini `reasoning_effort` support and an Advanced control
+  to the React basic example. Gemini 3 Flash / Flash-Lite supports
+  `minimal`, `low`, `medium`, and `high` with `minimal` as the chat default;
+  Gemini 3 Pro supports `low`, `medium`, and `high` with `low` as the default.
+  Gemini 2.5 remains excluded because it uses `thinkingBudget` instead.
+- Added Gemini 3.6 Flash (`gemini-3.6-flash`) and Gemini 3.5 Flash-Lite
+  (`gemini-3.5-flash-lite`) to the Gemini constants, supported-model and
+  vision lists, React basic selector, tests, and English/Japanese
+  documentation, while keeping Gemini 3.1 Flash-Lite as the default. Both new
+  models use minimal thinking by default for low-latency chat and to reduce the
+  risk of hidden thinking exhausting short output limits.
+- Updated Gemini 3 tool-call history handling to preserve provider call IDs
+  and thought signatures and to group parallel function calls and responses
+  for Gemini API compatibility.
+- Added Kimi K3 (`kimi-k3`) as an explicit Kimi model with vision support,
+  while keeping Kimi K2.6 (`kimi-k2.6`) as the default chat model.
+- Added Kimi K3 request handling for its currently required
+  `reasoning_effort: 'max'`, `max_completion_tokens`, streaming, and tool-call
+  flows, including preservation of `reasoning_content` and `tool_calls` for
+  multi-turn history.
+- Updated the React basic example, tests, and English/Japanese documentation
+  for Kimi K3, with the reasoning control fixed to `max` until lower effort
+  levels become available in the official API.
+
+## 0.47.0
+
+### Minor Changes
+
+- Added the Ministral 3 family (`ministral-3b-2512`,
+  `ministral-8b-2512`, and `ministral-14b-2512`) to the Mistral provider,
+  including vision support, the React basic selector, tests, and
+  English/Japanese documentation.
+- Added Z.ai GLM-5.1 (`glm-5.1`) for text chat and GLM-5V-Turbo
+  (`glm-5v-turbo`) for vision chat, including provider support, the React
+  basic selector, tests, and English/Japanese documentation.
+- Refreshed the React basic example with the package logo artwork, shared teal
+  design tokens, coordinated selection and chat controls, and responsive
+  desktop and mobile layouts.
+
+## 0.46.0
+
+### Minor Changes
+
+- Added OpenAI GPT-5.6 (`gpt-5.6` / `gpt-5.6-sol`), GPT-5.6 Terra
+  (`gpt-5.6-terra`), and GPT-5.6 Luna (`gpt-5.6-luna`) to the shared
+  constants, supported-model and vision lists, React basic selector, tests,
+  and English/Japanese documentation.
+- Added GPT-5.6 `max` reasoning effort support for Chat Completions and
+  Responses API requests, including model-aware normalization and output-token
+  budgeting.
+
+## 0.45.0
+
+### Minor Changes
+
+- Added xAI Grok 4.5 (`grok-4.5`) as an explicit chat model with
+  `reasoning_effort` defaulting to `low` for chat-style responses.
+- Enabled Grok 4.5 in the xAI vision support list so the React basic sample can
+  send image chat requests with this model.
+
+## 0.44.0
+
+### Minor Changes
+
+- Added provider capability discovery APIs for UI and agent planning, including
+  metadata for tools, MCP, JSON mode, vision, response length, and reasoning
+  effort support.
+- Added Claude Sonnet 5 (`claude-sonnet-5`) to the Claude constants, provider
+  supported model list, vision support metadata, tests, React basic selector,
+  and English/Japanese README documentation.
+
+## 0.43.0
+
+### Minor Changes
+
+- Added xAI `reasoning_effort` support for `grok-4.3`, including
+  `none`, `low`, `medium`, and `high` values.
+- Defaulted xAI `grok-4.3` reasoning effort to `none` for lower-latency
+  character chat responses, while omitting the option for unsupported xAI
+  models.
+- Updated the React basic example and English/Japanese README docs to expose
+  the xAI reasoning effort setting only when it applies.
+
+## 0.42.0
+
+### Minor Changes
+
+- Added a first-class PLaMo provider (`provider: 'plamo'`) using
+  OpenAI-compatible Chat Completions with `plamo-3.0-prime` as the default
+  model and `plamo-2.2-prime` as an explicit compatibility model.
+- Added PLaMo constants, service/provider exports, ChatServiceFactory
+  registration, transport-level tests, React basic selector support, and
+  English/Japanese README documentation.
+- Added PLaMo `reasoning_effort` support for the documented `none` and
+  `medium` values while keeping vision unsupported for this provider.
+
+## 0.41.0
+
+### Minor Changes
+
+- Added a first-class Sakana AI provider (`provider: 'sakana'`) using
+  OpenAI-compatible Chat Completions with `fugu` as the default model and
+  `fugu-ultra` / `fugu-ultra-20260615` as supported models.
+- Added Sakana constants, service/provider exports, ChatServiceFactory
+  registration, tests, English/Japanese README documentation, and a Node.js
+  `examples/sakana-basic` smoke-test sample.
+- Kept the React basic example source-aware of Sakana models while disabling
+  the provider in the browser UI because direct browser requests can fail with
+  CORS unless Sakana enables CORS for the caller's origin.
+
+## 0.40.0
+
+### Minor Changes
+
+- Added Kimi K2.7 Code (`kimi-k2.7-code`) and Kimi K2.7 Code HighSpeed
+  (`kimi-k2.7-code-highspeed`) to the Kimi constants, provider supported
+  model list, vision support metadata, tests, React basic selector, and
+  English/Japanese README documentation.
+- Kept thinking enabled for Kimi K2.7 Code models because those models do not
+  support non-thinking mode, including when tools are configured. Explicitly
+  setting `thinking: { type: 'disabled' }` for those models now throws before
+  sending the request.
+- Kept Kimi K2.6 as the Kimi provider default for chat-oriented usage.
+- Added Z.ai GLM-5.2 (`glm-5.2`) to the Z.ai constants, provider supported
+  model list, tests, React basic selector, and English/Japanese README
+  documentation.
+- Added OpenRouter curated entries for `moonshotai/kimi-k2.7-code` and
+  `z-ai/glm-5.2`.
+- Defaulted OpenRouter reasoning effort to `none` and disabled automatic
+  `max_tokens` for `z-ai/glm-5.2` to avoid empty responses when reasoning
+  tokens consume the whole output budget.
+
 ## 0.39.0
 
 ### Minor Changes

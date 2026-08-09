@@ -1,5 +1,44 @@
 # @aituber-onair/voice
 
+## Unreleased
+
+## 0.19.0
+
+### Minor Changes
+
+- Add browser-native Web Speech API support via `engineType: 'webSpeech'`.
+  - Introduce `WebSpeechEngine` for browser `speechSynthesis` playback,
+    including voice selection by `SpeechSynthesisVoice.name` or `voiceURI`.
+  - Add self-playing voice engine support in `VoiceEngineAdapter` for engines
+    that play audio directly instead of returning audio bytes.
+  - Support `webSpeechRate`, `webSpeechPitch`, `webSpeechVolume`, and
+    `webSpeechLanguage` options.
+  - Add Web Speech voice-list support through `getVoiceEngineVoiceList()`,
+    including browser `voiceschanged` handling for delayed voice population.
+  - Update the React voice example with automatic Web Speech voice loading,
+    sample-side language filtering, and browser-only setup notes.
+
+## 0.18.0
+
+### Minor Changes
+
+- Add engine capability and voice-list introspection helpers.
+  - Export `getVoiceEngineCapabilities()` and
+    `getAllVoiceEngineCapabilities()` so apps can inspect static engine
+    metadata before synthesis.
+  - Export `getVoiceEngineVoiceList()` to fetch normalized `{ id, label }`
+    voice choices for VOICEVOX, AivisSpeech, Aivis Cloud, xAI, ElevenLabs,
+    Inworld, and Gradium.
+  - Update the React example to use the shared voice-list helper instead of
+    duplicating provider-specific fetch logic.
+  - Keep MiniMax on documented system voice ID presets because the linked
+    dynamic voice-list API is currently unavailable.
+  - Mark Aivis Cloud as voice-list capable at the package level while keeping
+    browser examples on manual model UUID entry because model search can fail
+    browser CORS checks.
+  - Prefer `Response.arrayBuffer()` in OpenAI TTS response handling for better
+    browser and Node compatibility.
+
 ## 0.17.0
 
 ### Minor Changes

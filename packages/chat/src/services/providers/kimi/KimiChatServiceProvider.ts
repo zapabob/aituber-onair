@@ -1,7 +1,14 @@
 import {
   ENDPOINT_KIMI_CHAT_COMPLETIONS_API,
+  MODEL_KIMI_K3,
+  MODEL_KIMI_K2_7_CODE,
+  MODEL_KIMI_K2_7_CODE_HIGHSPEED,
   MODEL_KIMI_K2_6,
   MODEL_KIMI_K2_5,
+  getDefaultKimiReasoningEffort,
+  getKimiSupportedReasoningEfforts,
+  isKimiReasoningEffortModel,
+  isKimiThinkingRequiredModel,
   isKimiVisionModel,
 } from '../../../constants/kimi';
 import { ChatService } from '../../ChatService';
@@ -20,6 +27,8 @@ import { resolveVisionModel } from '../../../utils';
 export class KimiChatServiceProvider
   implements ChatServiceProvider<KimiChatServiceOptions>
 {
+  private readonly defaultThinking = { type: 'enabled' as const };
+
   /**
    * Create a chat service instance
    */
@@ -37,11 +46,11 @@ export class KimiChatServiceProvider
     });
 
     const tools: ToolDefinition[] | undefined = options.tools;
-    const defaultThinking = options.thinking ?? { type: 'enabled' as const };
-    const thinking =
-      tools && tools.length > 0
-        ? { type: 'disabled' as const }
-        : defaultThinking;
+    const thinking = this.resolveThinking(model, tools, options.thinking);
+    const reasoningEffort = this.resolveReasoningEffort(
+      model,
+      options.reasoning_effort,
+    );
 
     return new KimiChatService(
       options.apiKey,
@@ -52,6 +61,7 @@ export class KimiChatServiceProvider
       options.responseLength,
       options.responseFormat,
       thinking,
+      reasoningEffort,
     );
   }
 
@@ -66,7 +76,13 @@ export class KimiChatServiceProvider
    * Get the list of supported models
    */
   getSupportedModels(): string[] {
-    return [MODEL_KIMI_K2_6, MODEL_KIMI_K2_5];
+    return [
+      MODEL_KIMI_K3,
+      MODEL_KIMI_K2_7_CODE,
+      MODEL_KIMI_K2_7_CODE_HIGHSPEED,
+      MODEL_KIMI_K2_6,
+      MODEL_KIMI_K2_5,
+    ];
   }
 
   /**
@@ -121,5 +137,61 @@ export class KimiChatServiceProvider
 
   private normalizeEndpoint(value: string): string {
     return value.replace(/\/+$/, '');
+  }
+
+  private resolveThinking(
+    model: string,
+    tools: ToolDefinition[] | undefined,
+    thinking: KimiChatServiceOptions['thinking'],
+  ): KimiChatServiceOptions['thinking'] {
+    if (isKimiReasoningEffortModel(model)) {
+      if (thinking) {
+        throw new Error(
+          `Model ${model} uses reasoning_effort and does not support the K2.x thinking option.`,
+        );
+      }
+      return undefined;
+    }
+
+    if (isKimiThinkingRequiredModel(model)) {
+      if (thinking?.type === 'disabled') {
+        throw new Error(
+          `Model ${model} requires thinking mode and does not support thinking: disabled.`,
+        );
+      }
+      return thinking ?? this.defaultThinking;
+    }
+
+    if (tools && tools.length > 0) {
+      return { type: 'disabled' };
+    }
+
+    return thinking ?? this.defaultThinking;
+  }
+
+  private resolveReasoningEffort(
+    model: string,
+    reasoningEffort: KimiChatServiceOptions['reasoning_effort'],
+  ): KimiChatServiceOptions['reasoning_effort'] {
+    const supported = getKimiSupportedReasoningEfforts(model);
+
+    if (supported.length === 0) {
+      if (reasoningEffort !== undefined) {
+        throw new Error(
+          `Model ${model} does not support the reasoning_effort option.`,
+        );
+      }
+      return undefined;
+    }
+
+    const resolved =
+      reasoningEffort ?? getDefaultKimiReasoningEffort(model) ?? supported[0]!;
+    if (!supported.includes(resolved)) {
+      throw new Error(
+        `Model ${model} supports reasoning_effort values: ${supported.join(', ')}.`,
+      );
+    }
+
+    return resolved;
   }
 }

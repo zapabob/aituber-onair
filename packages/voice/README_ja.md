@@ -59,7 +59,7 @@ pnpm install @aituber-onair/voice
 ## 主な機能
 
 - **複数のTTSエンジン対応**  
-  VOICEVOX、VoicePeak、OpenAI TTS、xAI TTS、Unreal Speech、ElevenLabs、Inworld、Gradium、Gemini TTS、MiniMax、AivisSpeech、Aivis Cloudなどに対応
+  VOICEVOX、VoicePeak、OpenAI TTS、xAI TTS、Unreal Speech、ElevenLabs、Inworld、Gradium、Gemini TTS、MiniMax、AivisSpeech、Aivis Cloud、Web Speech APIなどに対応
 - **統一インターフェース**  
   すべての対応TTSエンジンに単一のAPI
 - **感情表現対応の合成**  
@@ -279,10 +279,11 @@ const voiceService = new VoiceService({
 既定の `https://api.gradium.ai/api/post/speech/tts` 以外を使う場合は
 `gradiumApiUrl` で上書きできます。`speaker` は Gradium の `voice_id`
 として送信されます。React デモでは Gradium の flagship voice プリセットを
-使い、表示名を選ばせつつ内部では voice ID を送信します。Gradium の
-voice-list エンドポイントは TTS エンドポイントと CORS 方針が異なる場合が
-あるため、ブラウザアプリで動的取得する場合はサーバー側から呼び出す必要が
-あります。
+fallback として表示し、API キーがある場合は `getVoiceEngineVoiceList()`
+経由で Gradium の voice list 取得を試せます。Gradium API がブラウザからの
+直接 CORS アクセスを許可していない場合は失敗するため、production の
+browser UI で動的な Gradium voice 選択を行う場合は backend proxy を
+使用してください。
 
 ### OpenAI互換 TTS
 Kokoro FastAPI などの OpenAI 互換エンドポイントを利用するための TTS プロバイダーです。
@@ -306,7 +307,7 @@ HD品質で24言語をサポートする多言語TTS。
 ```typescript
 const voiceService = new VoiceService({
   engineType: 'minimax',
-  speaker: 'male-qn-qingse',
+  speaker: 'Japanese_IntellectualSenior',
   apiKey: 'your-minimax-api-key',
   groupId: 'your-group-id', // MiniMaxでは必須
   endpoint: 'global' // または 'china'
@@ -314,6 +315,13 @@ const voiceService = new VoiceService({
 ```
 
 **注意**：MiniMaxは認証にAPIキーとGroupIdの両方が必要です。GroupIdはユーザーグループ管理、使用状況追跡、課金に使用されます。
+
+`speaker` には `Japanese_IntellectualSenior` などの MiniMax system voice ID
+を指定してください。MiniMax は公式の
+[System Voice ID List](https://platform.minimax.io/docs/faq/system-voice-id)
+でこれらの ID を公開しています。リンクされている動的な Get Voice API は
+現在利用できないため、`getVoiceEngineVoiceList()` では MiniMax の
+voice list 取得を扱っていません。
 
 ### AivisSpeech
 自然な音声品質を持つAI駆動の音声合成。
@@ -355,6 +363,15 @@ const voiceService = new VoiceService({
 - **感情制御**: きめ細かな感情強度設定
 - **高品質**: プロフェッショナルグレードの音声合成
 
+`getVoiceEngineVoiceList('aivisCloud')` は Aivis Cloud の model search API
+（`GET https://api.aivis-project.com/v1/aivm-models/search`）を使い、
+`speaker` または `aivisCloudModelUuid` に渡せる model UUID の選択肢を返します。
+ただし、ブラウザから直接 model/list 系 endpoint を呼び出すと CORS で失敗する
+場合があります。動的に model / speaker / style を取得したい browser app では、
+Node.js backend や backend relay/proxy 側でこの helper を呼び出してください。
+React example は、ブラウザから model search endpoint を直接呼ばず、手入力の
+model UUID を使う形を維持しています。
+
 ### Gemini TTS
 `gemini-3.1-flash-tts-preview` を含む Gemini preview TTS モデルを
 Gemini API 経由で利用する音声合成です。認証は API キーのみです。
@@ -375,6 +392,30 @@ const voiceService = new VoiceService({
 **注意**：通常の Google API キーを利用します。`apiKey` は Gemini
 API に `x-goog-api-key` として送信されます。利用可能なボイスには
 Zephyr、Aoede、Kore、Puck、Charon など 30 種類のプリセットボイスがあります。
+
+### Web Speech API
+`window.speechSynthesis` を使うブラウザ標準の音声合成です。この engine は
+音声バイト列を返さず、ブラウザが直接再生します。
+
+```typescript
+const voiceService = new VoiceEngineAdapter({
+  engineType: 'webSpeech',
+  speaker: '', // オプション：SpeechSynthesisVoice の name または voiceURI
+  webSpeechLanguage: 'ja-JP',
+  webSpeechRate: 1.1,
+  webSpeechPitch: 1.0,
+  webSpeechVolume: 1.0,
+});
+
+await voiceService.speak({ text: 'こんにちは' });
+```
+
+ブラウザ上で `getVoiceEngineVoiceList('webSpeech')` を呼ぶと、利用可能な
+`SpeechSynthesisVoice` を取得できます。一部ブラウザでは voice list が非同期に
+読み込まれるため、この helper は短時間 `voiceschanged` を待ちます。
+`ArrayBuffer` が存在しないため、この engine では `onPlay(audioBuffer)` は
+呼ばれません。utterance 終了時の `onComplete` は呼ばれます。実行環境は
+ブラウザのみです。
 
 ### None（サイレントモード）
 音声出力なし - テストやテキストのみのシナリオに便利。
@@ -659,12 +700,14 @@ try {
 - 指定した `speaker` をそのまま `voice_id` として送信
 - output format と、temperature / voice similarity / speed / rewrite rules 用の `json_config` 調整に対応
 - flagship voice プリセットの読みやすい音声名を Speaker セレクターに表示
+- provider が直接 CORS アクセスをブロックする場合、browser app での動的な voice list 取得には backend proxy が必要
 
 ### MiniMaxの機能
 - 自動検出付き24言語サポート
 - HD品質のオーディオ出力
 - デュアルリージョンエンドポイント（global/china）
 - 高度な感情合成
+- 動的な voice list 取得ではなく、公式 system voice ID を指定
 
 ### Gemini TTS の機能
 - Gemini API ベースの高品質音声合成
@@ -673,6 +716,12 @@ try {
 - `x-goog-api-key` によるシンプルな API キー認証
 - Gemini API ベース URL の切り替えに対応
 - 日本語を含む24以上の言語サポート
+
+### Web Speech API の機能
+- API キー不要のブラウザ標準 `speechSynthesis` 再生
+- ブラウザ専用。Node.js / server runtime では音声バイト列を出力しません
+- `SpeechSynthesisVoice.name` または `voiceURI` による話者選択
+- ブラウザ voice が対応する範囲で rate、pitch、volume、language を指定可能
 
 ## AITuber OnAir Coreとの統合
 
@@ -714,6 +763,7 @@ type VoiceServiceOptions =
   | AivisCloudVoiceServiceOptions
   | MinimaxVoiceServiceOptions
   | PiperPlusVoiceServiceOptions
+  | WebSpeechVoiceServiceOptions
   | NoneVoiceServiceOptions;
 ```
 
@@ -722,6 +772,55 @@ type VoiceServiceOptions =
 `switchEngine(...)` を使用してください。
 後方互換のため、`updateOptions(...)` へエンジン切替用フィールドを
 渡す使い方も引き続き受け付けます。
+
+### エンジン capabilities
+
+```typescript
+import {
+  getAllVoiceEngineCapabilities,
+  getVoiceEngineCapabilities,
+} from '@aituber-onair/voice';
+
+const gradium = getVoiceEngineCapabilities('gradium');
+console.log(gradium.supportsVoiceList); // true
+
+const allEngines = getAllVoiceEngineCapabilities();
+```
+
+capabilities は静的な metadata だけを返します。API キー、endpoint、ユーザー
+設定、その他の機密値は含みません。
+
+### ボイス一覧
+
+```typescript
+import { getVoiceEngineVoiceList } from '@aituber-onair/voice';
+
+const voices = await getVoiceEngineVoiceList('elevenLabs', {
+  apiKey: process.env.ELEVENLABS_API_KEY,
+});
+
+// [{ id: '...', label: 'Rachel (premade)' }, ...]
+```
+
+`getVoiceEngineVoiceList()` は、一覧 API を持つ engine について
+正規化済みの `{ id, label }` を返します。対象は VOICEVOX、AivisSpeech、
+Aivis Cloud、xAI、ElevenLabs、Inworld、Gradium、Web Speech API です。
+VOICEVOX 互換サーバーには local `apiUrl`、API key が必要な cloud engine には
+`apiKey`、Inworld の絞り込みには `language` を渡します。
+
+browser app では、cloud provider の voice list endpoint が CORS を許可している
+必要があります。provider がブラウザからの直接リクエストをブロックする場合は、
+backend 側で `getVoiceEngineVoiceList()` を呼ぶか、小さな relay/proxy を
+用意してください。
+
+Aivis Cloud の voice-list 対応は、model search endpoint に対する
+package-level の対応です。ブラウザから Aivis Cloud の model/list 系 endpoint を
+直接呼び出すと CORS でブロックされる場合があります。production UI で動的な
+Aivis Cloud model 選択を行う場合は、Node.js/backend 側で helper を呼ぶか
+backend proxy を用意してください。
+
+MiniMax もこの helper の対象外です。リンクされている動的な Get Voice API は
+現在利用できないため、公式 system voice ID を直接指定してください。
 
 ### VoiceServiceメソッド
 

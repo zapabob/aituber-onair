@@ -1,5 +1,53 @@
 # @aituber-onair/comment-intelligence
 
+## Unreleased
+
+## 0.0.5
+
+### Patch Changes
+
+- Adds `toAgentCommentDecision()` for compact agent-facing decisions that avoid
+  returning the full ranked comment list by default.
+- Adds SDK-independent agent tool definitions through
+  `ANALYZE_LIVE_COMMENTS_TOOL` and `COMMENT_INTELLIGENCE_AGENT_TOOLS`.
+- Exports `DEFAULT_COMMENT_INTELLIGENCE_CONFIG` for agent and UI introspection.
+- Adds a small Node.js agent decision sample that demonstrates compact output,
+  full detail output, and the tool definition summary.
+- Adds answered comment memory so apps can mark comments as answered and have
+  later rules-based ranking deterministically deprioritize or exclude those
+  comments, with TTL and optional viewer-level dedupe.
+
+## 0.0.4
+
+### Patch Changes
+
+- Adds `topicFilter` ranking options (`off`, `prefer`, and `require`) for
+  prioritizing or requiring comments related to the current stream topic.
+- Adds the `topic_unrelated` ranking reason for comments that do not match a
+  configured stream topic.
+- Passes stream topic and title context into LLM analysis prompts and supports
+  `topicRelatedCommentIds` so LLM-assisted analysis can mark semantically
+  related comments as topic-related.
+- Strengthens the LLM topic-matching prompt to include synonyms, paraphrases,
+  and related subtopics.
+- Reflects LLM-provided `topicRelatedCommentIds` in selected comments for
+  `prefer` and `require` topic filtering.
+- Fixes LLM-mode selection to honor `maxSelectedComments`.
+- Exposes unmatched LLM-returned comment IDs in debug metadata.
+- Improves OpenAI sample diagnostics and uses short comment IDs that LLMs can
+  echo reliably.
+- Adds stream topic, stream title, and topic priority settings to the React
+  examples and starter pet template.
+
+## 0.0.3
+
+### Patch Changes
+
+- Fixes the published ESM package so it can be imported directly by Node.js by
+  emitting Node-compatible relative module specifiers.
+- Adds a package exports map and a built package smoke test that imports
+  `dist/index.js` with plain Node.js.
+
 ## 0.0.2
 
 ### Patch Changes

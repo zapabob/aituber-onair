@@ -20,12 +20,15 @@ export type {
   OpenRouterChatServiceOptions,
   GeminiChatServiceOptions,
   GeminiNanoChatServiceOptions,
+  GeminiNanoInitialPrompt,
   ClaudeChatServiceOptions,
   ZAIChatServiceOptions,
   XAIChatServiceOptions,
   KimiChatServiceOptions,
   DeepSeekChatServiceOptions,
   MistralChatServiceOptions,
+  SakanaChatServiceOptions,
+  PlamoChatServiceOptions,
   ChatServiceProvider,
   VisionSupportLevel,
 } from './services/providers/ChatServiceProvider';
@@ -71,11 +74,20 @@ export { DeepSeekChatServiceProvider } from './services/providers/deepseek/DeepS
 export { MistralChatService } from './services/providers/mistral/MistralChatService';
 export { MistralChatServiceProvider } from './services/providers/mistral/MistralChatServiceProvider';
 
+// Sakana provider exports
+export { SakanaChatService } from './services/providers/sakana/SakanaChatService';
+export { SakanaChatServiceProvider } from './services/providers/sakana/SakanaChatServiceProvider';
+
+// PLaMo provider exports
+export { PlamoChatService } from './services/providers/plamo/PlamoChatService';
+export { PlamoChatServiceProvider } from './services/providers/plamo/PlamoChatServiceProvider';
+
 // Constants exports
 export * from './constants';
 
 // Utility exports
 export * from './utils';
+export * from './backend';
 
 // Adapters
 export { installGASFetch } from './adapters/gasFetch';

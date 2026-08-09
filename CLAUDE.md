@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AITuber OnAir is a TypeScript monorepo that provides a comprehensive toolkit for creating AI-powered virtual streamers (AITubers). The project consists of six main packages:
+AITuber OnAir is a TypeScript monorepo that provides a comprehensive toolkit for creating AI-powered virtual streamers (AITubers). The project consists of seven main packages:
 
 - **`@aituber-onair/core`** - Core library for AI-driven virtual streaming applications with memory management and event-driven architecture
 - **`@aituber-onair/chat`** - Chat and LLM API integration library supporting multiple AI providers (OpenAI, Claude, Gemini) with unified interface
@@ -12,8 +12,9 @@ AITuber OnAir is a TypeScript monorepo that provides a comprehensive toolkit for
 - **`@aituber-onair/manneri`** - Conversation pattern detection library that identifies repetitive dialogue and provides topic diversification prompts
 - **`@aituber-onair/bushitsu-client`** - WebSocket client library for chat functionality with React hooks support, auto-reconnection, rate limiting, and mention support
 - **`@aituber-onair/kizuna`** - Sophisticated bond system for managing user-AI character relationships with points, achievements, and emotion-based interactions
+- **`@aituber-onair/noise`** - Context-aware response noise engine (deviation orchestration) that rewrites overly predictable LLM replies after generation, with rhythm/relationship/sincerity gates and a reaction-learning loop
 
-Each package can be used independently or together. The chat package handles LLM interactions, voice package provides TTS functionality, manneri handles conversation variety, bushitsu-client enables WebSocket chat communication, kizuna manages user relationships and engagement, and core integrates everything for full AITuber functionality.
+Each package can be used independently or together. The chat package handles LLM interactions, voice package provides TTS functionality, manneri handles conversation variety, bushitsu-client enables WebSocket chat communication, kizuna manages user relationships and engagement, noise disturbs overly predictable response landings after generation, and core integrates everything for full AITuber functionality.
 
 ## Common Development Commands
 
@@ -30,7 +31,7 @@ npm run fmt
 # Run linting
 npm run lint
 
-# Package-specific commands (replace [package] with: core, chat, voice, manneri, bushitsu-client, or kizuna)
+# Package-specific commands (replace [package] with: core, chat, voice, manneri, bushitsu-client, kizuna, or noise)
 cd packages/[package] && npm run build      # Build specific package
 cd packages/[package] && npm run typecheck  # Type check only
 cd packages/[package] && npm run test       # Run tests
@@ -59,41 +60,55 @@ This repository uses open-format Agent Skills and keeps Codex and Claude Code
 skill definitions aligned.
 
 - Skill guide: `docs/agent-skills.md`
+- Model/provider update guide:
+  `docs/agent-model-provider-guidelines.md`
+- For any LLM/TTS model or provider addition/update, first read
+  `docs/agent-model-provider-guidelines.md`. Do not add a model/provider to
+  supported lists unless the exact endpoint family, request shape, response
+  shape, capabilities, and user configuration path are documented or
+  live-verified.
 - Skills:
   - `add-chat-model`
   - `add-tts-provider`
   - `sync-core-after-chat-upgrade`
   - `wrap-tts-as-openai-compatible`
   - `connect-colab-local-tts`
+  - `connect-colab-local-llm`
 - Canonical sources:
   - `skills/add-chat-model/SKILL.md`
   - `skills/add-tts-provider/SKILL.md`
   - `skills/sync-core-after-chat-upgrade/SKILL.md`
   - `skills/wrap-tts-as-openai-compatible/SKILL.md`
   - `skills/connect-colab-local-tts/SKILL.md`
+  - `skills/connect-colab-local-llm/SKILL.md`
 - Claude Code runtime paths:
   - `.claude/skills/add-chat-model/SKILL.md`
   - `.claude/skills/add-tts-provider/SKILL.md`
   - `.claude/skills/sync-core-after-chat-upgrade/SKILL.md`
   - `.claude/skills/wrap-tts-as-openai-compatible/SKILL.md`
   - `.claude/skills/connect-colab-local-tts/SKILL.md`
+  - `.claude/skills/connect-colab-local-llm/SKILL.md`
 
 Usage:
 
 - Invoke explicitly with `$add-chat-model`, or use prompts like
   "add a new model", "support model <model_id>", or
-  "update supported models".
+  "update supported models". Apply the hard gates in
+  `docs/agent-model-provider-guidelines.md` before editing supported lists.
 - Invoke explicitly with `$add-tts-provider`, or use prompts like
   "add a TTS provider", "support <provider> TTS", or
-  "update supported voice providers".
+  "update supported voice providers". Apply the hard gates in
+  `docs/agent-model-provider-guidelines.md` before adding first-class support.
 - Invoke `$sync-core-after-chat-upgrade` after chat upgrades when the same
   changes must be propagated into core and core examples.
 - When propagating `@aituber-onair/voice` upgrades into `@aituber-onair/core`,
   update all core React examples that expose TTS settings, not only
   `react-basic`: `packages/core/examples/react-basic`,
   `packages/core/examples/react-pngtuber-app`,
-  `packages/core/examples/react-vrm-app`, and
-  `packages/core/examples/react-live2d-app`. For every new TTS provider, check
+  `packages/core/examples/react-pet-app`,
+  `packages/core/examples/react-vrm-app`,
+  `packages/core/examples/react-live2d-app`, and
+  `packages/core/examples/react-purupuru-app`. For every new TTS provider, check
   the engine selector, persisted settings type/defaults, settings UI,
   `VoiceServiceOptions` wiring, README mention, lockfile metadata, and example
   build. If the provider has a voice-list API, surface it as a selectable list
@@ -111,14 +126,31 @@ Usage:
 - Invoke explicitly with `$connect-colab-local-tts`, or use prompts like
   "connect Colab local TTS", "launch local-tts-on-google-colab with Colab MCP
   Go", or "try a Colab OpenAI-compatible TTS URL from @aituber-onair/voice".
+- Invoke explicitly with `$connect-colab-local-llm`, or use prompts like
+  "launch vLLM on Colab", "serve a GGUF model with llama.cpp on Colab",
+  "connect a Colab local LLM to a Core sample", or "verify a Colab
+  OpenAI-compatible chat endpoint with @aituber-onair/chat". Use vLLM for
+  native Hugging Face checkpoints and llama.cpp for GGUF artifacts. Issue the
+  temporary public URL with a cloudflared Quick Tunnel, generate the backend
+  API key automatically, and rerun the streaming compatibility probe in every
+  session. Do not fall back to ngrok.
+- Invoke explicitly with `$create-pngtuber-avatar-states`, or use prompts like
+  "create PNGTuber avatar state images", "generate mouth and eye open-close
+  variants", "split a 2x2 avatar sheet", "remove avatar background", or
+  "align avatar state images". Claude Code cannot run the image-generation
+  phase of this skill. In Claude Code, use it only for existing image files:
+  splitting sheets, removing suitable plain backgrounds, aligning states, and
+  validating outputs.
 - If input is missing, collect:
   `provider`, `model_id`, `model_const_name`, `display_name`,
-  `supports_vision`, and optional `bump_version` (default `true`).
+  `supports_vision`, and optional `bump_version` (default `false`; set `true`
+  only when release/version work is explicitly requested).
 - For `$add-tts-provider`, collect:
   `engine_type`, `engine_class_name`, `display_name`, `provider_kind`,
   `default_speaker`, `requires_api_key`, `supports_emotion`,
   `option_fields`, and optional `default_api_url`, `examples_scope`,
-  `bump_version` (default `true`).
+  `bump_version` (default `false`; set `true` only when release/version work is
+  explicitly requested).
 - Follow the skill procedure end-to-end, including tests/docs/versioning
   updates and final verification commands.
 - After `add-chat-model` completes, ask whether to run
@@ -143,6 +175,12 @@ Maintenance:
 - For Colab local TTS connection workflow updates, edit
   `skills/connect-colab-local-tts/SKILL.md` and sync to
   `.claude/skills/connect-colab-local-tts/SKILL.md`.
+- For Colab local LLM connection workflow updates, edit
+  `skills/connect-colab-local-llm/SKILL.md` and sync to
+  `.claude/skills/connect-colab-local-llm/SKILL.md`.
+- For PNGTuber avatar state image workflow updates, edit
+  `skills/create-pngtuber-avatar-states/SKILL.md` and sync to
+  `.claude/skills/create-pngtuber-avatar-states/SKILL.md`.
 
 ## System Architecture
 
@@ -172,8 +210,10 @@ packages/
 │   └── examples/   # Conversation pattern detection examples
 ├── bushitsu-client/# WebSocket client, React hooks
 │   └── examples/   # WebSocket client usage examples
-└── kizuna/         # KizunaManager, storage providers, point system
-    └── examples/   # Bond system implementation examples
+├── kizuna/         # KizunaManager, storage providers, point system
+│   └── examples/   # Bond system implementation examples
+└── noise/          # Contaminator pipeline, gates, gag ledger, reaction loop
+    └── examples/   # Browser labs for noise rewrites and session simulation
 ```
 
 Each package contains an `examples/` directory with code samples demonstrating typical usage patterns and integration scenarios.
@@ -188,6 +228,11 @@ Each package contains an `examples/` directory with code samples demonstrating t
 - Document public APIs with JSDoc comments
 - Prefer async/await for potentially long operations
 - Use Vitest for all tests following AAA pattern
+- In docs, do not single out a specific model/provider as an unexplained
+  exception. State the general rule first (which group it belongs to and why),
+  then name the current instances — e.g., "providers whose APIs cannot be
+  called directly from the browser are shown disabled — currently only
+  Sakana AI" instead of "Sakana AI is disabled here"
 
 ### Important Considerations
 
@@ -362,6 +407,7 @@ Essential `package.json` fields:
 
 - **Core**: Includes chat and voice as dependencies for full functionality
 - **Chat, Voice, Manneri, Bushitsu-client, Kizuna**: Completely independent, zero inter-package dependencies
+- **Noise**: Depends only on chat (lazily loaded) for the optional built-in LLM rewrite backend; custom `model` adapters need no dependency
 - **Browser Compatibility**: Kizuna and Manneri designed for zero external dependencies
 
 ---

@@ -1,11 +1,12 @@
-import type { LiveComment } from './comment';
-import type { SafetyReport } from './safety';
+import type { LiveComment } from './comment.js';
+import type { SafetyReport } from './safety.js';
 
 export type RankingReason =
   | 'direct_question'
   | 'new_viewer'
   | 'returning_viewer'
   | 'topic_related'
+  | 'topic_unrelated'
   | 'topic_change_candidate'
   | 'high_engagement'
   | 'easy_to_answer'

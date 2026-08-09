@@ -1,26 +1,157 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { ChatPanel } from './components/ChatPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useAudioLipsync } from './hooks/useAudioLipsync';
 import { useAituberCore } from './hooks/useAituberCore';
 import { useLiveCommentIntelligence } from './hooks/useLiveCommentIntelligence';
+import { useScreenVisionController } from './hooks/useScreenVisionController';
 import { useSettings } from './hooks/useSettings';
 import { useTwitchComments } from './hooks/useTwitchComments';
 import { useYoutubeComments } from './hooks/useYoutubeComments';
+import { clampDialogDragDelta, type DialogDragPoint } from './lib/dialogDrag';
+import { getEmotionEffectAnchor } from './lib/emotionEffectAnchor';
+import {
+  createLinkedVrmEmotionEffectReaction,
+  createVrmReactionFromScreenplay,
+  sustainVrmReactionForSpeech,
+  withReactionId,
+  withVrmEmotionEffectReactionId,
+} from './lib/vrmReactions';
+import type {
+  ScreenplayLike,
+  VrmAvatarReaction,
+  VrmAvatarReactionDraft,
+  VrmEmotionEffectReaction,
+  VrmEmotionEffectReactionDraft,
+} from './lib/vrmReactions';
 import type { TwitchChatMessage } from './services/twitch/twitchService';
 import type { YouTubeChatMessage } from './services/youtube/youtubeService';
 import './styles/app.css';
+
+const DEFAULT_SETTINGS_DIALOG_OFFSET: DialogDragPoint = { x: 0, y: 0 };
+const VRM_EFFECT_ANCHOR_PROFILE_ID = 'avatar/miko.vrm';
+
+interface SettingsDialogDragState {
+  pointerId: number;
+  pointerStart: DialogDragPoint;
+  offsetStart: DialogDragPoint;
+  rect: DOMRect;
+}
 
 export default function App() {
   const { play, stop, mouthLevel, isSpeaking } = useAudioLipsync();
   const settingsHook = useSettings();
   const updateTwitchAccessToken = settingsHook.updateTwitchAccessToken;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDialogOffset, setSettingsDialogOffset] =
+    useState<DialogDragPoint>(DEFAULT_SETTINGS_DIALOG_OFFSET);
+  const [settingsDialogDragging, setSettingsDialogDragging] = useState(false);
   const [streamErrorMessage, setStreamErrorMessage] = useState('');
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(
     null,
   );
   const backgroundObjectUrlRef = useRef<string | null>(null);
+  const settingsDialogRef = useRef<HTMLDivElement | null>(null);
+  const settingsDialogDragRef = useRef<SettingsDialogDragState | null>(null);
+  const avatarReactionIdRef = useRef(0);
+  const emotionEffectReactionIdRef = useRef(0);
+  const [avatarReaction, setAvatarReaction] =
+    useState<VrmAvatarReaction | null>(null);
+  const [emotionEffectReaction, setEmotionEffectReaction] =
+    useState<VrmEmotionEffectReaction | null>(null);
+
+  const emitAvatarReaction = useCallback((draft: VrmAvatarReactionDraft) => {
+    avatarReactionIdRef.current += 1;
+    setAvatarReaction(withReactionId(draft, avatarReactionIdRef.current));
+  }, []);
+
+  const emitEmotionEffectReaction = useCallback(
+    (draft: VrmEmotionEffectReactionDraft) => {
+      emotionEffectReactionIdRef.current += 1;
+      setEmotionEffectReaction(
+        withVrmEmotionEffectReactionId(
+          draft,
+          emotionEffectReactionIdRef.current,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleSettingsDialogPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      if ((event.target as Element).closest('button')) return;
+      const dialog = settingsDialogRef.current;
+      if (!dialog) return;
+
+      settingsDialogDragRef.current = {
+        pointerId: event.pointerId,
+        pointerStart: { x: event.clientX, y: event.clientY },
+        offsetStart: settingsDialogOffset,
+        rect: dialog.getBoundingClientRect(),
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setSettingsDialogDragging(true);
+      event.preventDefault();
+    },
+    [settingsDialogOffset],
+  );
+
+  const handleSettingsDialogPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = settingsDialogDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const delta = clampDialogDragDelta(
+        {
+          x: event.clientX - drag.pointerStart.x,
+          y: event.clientY - drag.pointerStart.y,
+        },
+        drag.rect,
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      setSettingsDialogOffset({
+        x: drag.offsetStart.x + delta.x,
+        y: drag.offsetStart.y + delta.y,
+      });
+    },
+    [],
+  );
+
+  const finishSettingsDialogDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = settingsDialogDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      settingsDialogDragRef.current = null;
+      setSettingsDialogDragging(false);
+    },
+    [],
+  );
+
+  const resetSettingsDialogPosition = useCallback(() => {
+    settingsDialogDragRef.current = null;
+    setSettingsDialogDragging(false);
+    setSettingsDialogOffset(DEFAULT_SETTINGS_DIALOG_OFFSET);
+  }, []);
+
+  const closeSettingsDialog = useCallback(() => {
+    resetSettingsDialogPosition();
+    setSettingsOpen(false);
+  }, [resetSettingsDialogPosition]);
+
+  const toggleSettingsDialog = useCallback(() => {
+    resetSettingsDialogPosition();
+    setSettingsOpen((open) => !open);
+  }, [resetSettingsDialogPosition]);
 
   const handleAudioPlay = useCallback(
     async (arrayBuffer: ArrayBuffer) => {
@@ -29,20 +160,68 @@ export default function App() {
     [play],
   );
 
-  const { messages, isProcessing, partialResponse, processChat } =
-    useAituberCore({
-      onAudioPlay: handleAudioPlay,
-      settings: settingsHook.settings,
-      getApiKeyForProvider: settingsHook.getApiKeyForProvider,
-    });
+  const handleSpeechStart = useCallback(
+    (screenplay: ScreenplayLike) => {
+      const nativeReaction = createVrmReactionFromScreenplay(screenplay);
+      if (nativeReaction) {
+        emitAvatarReaction(sustainVrmReactionForSpeech(nativeReaction));
+      } else {
+        emitAvatarReaction({ type: 'reset', fadeMs: 220 });
+      }
+
+      const emotionEffectReaction = createLinkedVrmEmotionEffectReaction(
+        settingsHook.settings.visual.vrmReactionControlMode,
+        screenplay,
+        settingsHook.settings.visual.vrmEmotionEffectMap,
+      );
+      if (emotionEffectReaction) {
+        emitEmotionEffectReaction(emotionEffectReaction);
+      } else {
+        setEmotionEffectReaction(null);
+      }
+    },
+    [
+      emitAvatarReaction,
+      emitEmotionEffectReaction,
+      settingsHook.settings.visual.vrmEmotionEffectMap,
+      settingsHook.settings.visual.vrmReactionControlMode,
+    ],
+  );
+
+  const handleSpeechEnd = useCallback(() => {
+    emitAvatarReaction({ type: 'reset', fadeMs: 360 });
+    setEmotionEffectReaction(null);
+  }, [emitAvatarReaction]);
+
+  const {
+    messages,
+    isProcessing,
+    partialResponse,
+    processChat,
+    processVisionChat,
+  } = useAituberCore({
+    onAudioPlay: handleAudioPlay,
+    onSpeechStart: handleSpeechStart,
+    onSpeechEnd: handleSpeechEnd,
+    settings: settingsHook.settings,
+    getApiKeyForProvider: settingsHook.getApiKeyForProvider,
+  });
+  const screenVisionController = useScreenVisionController({
+    settings: settingsHook.settings.screenVision,
+    onCapture: processVisionChat,
+    onEnabledChange: settingsHook.updateScreenVisionEnabled,
+    onDeviceIdChange: settingsHook.updateScreenVisionDeviceId,
+  });
 
   const handleSend = useCallback(
     (text: string) => {
       // Stop previous audio if speech is currently playing
       stop();
+      emitAvatarReaction({ type: 'reset', fadeMs: 160 });
+      setEmotionEffectReaction(null);
       processChat(text);
     },
-    [stop, processChat],
+    [stop, emitAvatarReaction, processChat],
   );
 
   const { enqueueYouTubeComments, enqueueTwitchComments } =
@@ -66,6 +245,9 @@ export default function App() {
         settingsHook.settings.commentIntelligence.blockHighRiskViewers,
       viewerBlockDurationMs:
         settingsHook.settings.commentIntelligence.viewerBlockDurationMs,
+      streamTopic: settingsHook.settings.commentIntelligence.streamTopic,
+      streamTitle: settingsHook.settings.commentIntelligence.streamTitle,
+      topicFilter: settingsHook.settings.commentIntelligence.topicFilter,
     });
 
   const handleYoutubeComment = useCallback(
@@ -156,11 +338,19 @@ export default function App() {
   useEffect(() => {
     if (!settingsOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSettingsOpen(false);
+      if (e.key === 'Escape') closeSettingsDialog();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settingsOpen]);
+  }, [closeSettingsDialog, settingsOpen]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+
+    const handleResize = () => resetSettingsDialogPosition();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [resetSettingsDialogPosition, settingsOpen]);
 
   useEffect(() => {
     const backgroundObjectUrl = backgroundObjectUrlRef;
@@ -181,21 +371,54 @@ export default function App() {
         onSend={handleSend}
         mouthLevel={mouthLevel}
         isSpeaking={isSpeaking}
+        avatarReaction={avatarReaction}
+        emotionEffectReaction={emotionEffectReaction}
+        reactionControlMode={
+          settingsHook.settings.visual.vrmReactionControlMode
+        }
+        emotionEffectMap={settingsHook.settings.visual.vrmEmotionEffectMap}
+        effectAnchor={getEmotionEffectAnchor(
+          settingsHook.settings.visual.vrmEmotionEffectAnchors,
+          VRM_EFFECT_ANCHOR_PROFILE_ID,
+        )}
+        onEffectAnchorChange={(anchor) =>
+          settingsHook.updateVisualVrmEmotionEffectAnchor(
+            VRM_EFFECT_ANCHOR_PROFILE_ID,
+            anchor,
+          )
+        }
+        onEffectAnchorReset={() =>
+          settingsHook.resetVisualVrmEmotionEffectAnchor(
+            VRM_EFFECT_ANCHOR_PROFILE_ID,
+          )
+        }
         backgroundImageUrl={backgroundImageUrl}
-        onToggleSettings={() => setSettingsOpen((v) => !v)}
+        visual={settingsHook.settings.visual}
+        onToggleSettings={toggleSettingsDialog}
       />
 
       {settingsOpen && (
-        <div
-          className="settings-dialog-overlay"
-          onClick={() => setSettingsOpen(false)}
-        >
-          <div className="settings-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="settings-dialog-header">
+        <div className="settings-dialog-overlay" onClick={closeSettingsDialog}>
+          <div
+            ref={settingsDialogRef}
+            className="settings-dialog"
+            style={{
+              transform: `translate3d(${settingsDialogOffset.x}px, ${settingsDialogOffset.y}px, 0)`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`settings-dialog-header${settingsDialogDragging ? ' is-dragging' : ''}`}
+              onPointerDown={handleSettingsDialogPointerDown}
+              onPointerMove={handleSettingsDialogPointerMove}
+              onPointerUp={finishSettingsDialogDrag}
+              onPointerCancel={finishSettingsDialogDrag}
+              onLostPointerCapture={finishSettingsDialogDrag}
+            >
               <h2>Settings</h2>
               <button
                 className="settings-dialog-close"
-                onClick={() => setSettingsOpen(false)}
+                onClick={closeSettingsDialog}
               >
                 &times;
               </button>
@@ -205,6 +428,7 @@ export default function App() {
               isProcessing={isProcessing}
               backgroundImageUrl={backgroundImageUrl}
               streamErrorMessage={streamErrorMessage}
+              screenVisionController={screenVisionController}
               onBackgroundImageChange={handleBackgroundImageChange}
             />
           </div>

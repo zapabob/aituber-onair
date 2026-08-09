@@ -3,8 +3,11 @@ import { ZAIChatServiceProvider } from '../../src/services/providers/zai/ZAIChat
 import type { ZAIChatServiceOptions } from '../../src/services/providers/ChatServiceProvider';
 import {
   ENDPOINT_ZAI_CHAT_COMPLETIONS_API,
+  MODEL_GLM_5_2,
+  MODEL_GLM_5_1,
   MODEL_GLM_5,
   MODEL_GLM_5_TURBO,
+  MODEL_GLM_5V_TURBO,
   MODEL_GLM_4_7,
   MODEL_GLM_4_7_FLASHX,
   MODEL_GLM_4_7_FLASH,
@@ -35,8 +38,11 @@ describe('ZAIChatServiceProvider', () => {
     it('should return array of supported models', () => {
       const models = provider.getSupportedModels();
       expect(models).toEqual([
+        MODEL_GLM_5_2,
+        MODEL_GLM_5_1,
         MODEL_GLM_5,
         MODEL_GLM_5_TURBO,
+        MODEL_GLM_5V_TURBO,
         MODEL_GLM_4_7,
         MODEL_GLM_4_7_FLASHX,
         MODEL_GLM_4_7_FLASH,
@@ -49,8 +55,8 @@ describe('ZAIChatServiceProvider', () => {
   });
 
   describe('getDefaultModel', () => {
-    it('should return glm-4.7 as default model', () => {
-      expect(provider.getDefaultModel()).toBe(MODEL_GLM_4_7);
+    it('should return glm-5.2 as default model', () => {
+      expect(provider.getDefaultModel()).toBe(MODEL_GLM_5_2);
     });
   });
 
@@ -63,6 +69,10 @@ describe('ZAIChatServiceProvider', () => {
 
   describe('supportsVisionForModel', () => {
     it('should return true for vision-supported models', () => {
+      expect(provider.supportsVisionForModel(MODEL_GLM_5V_TURBO)).toBe(true);
+      expect(provider.getVisionSupportLevelForModel(MODEL_GLM_5V_TURBO)).toBe(
+        'supported',
+      );
       expect(provider.supportsVisionForModel(MODEL_GLM_4_6V_FLASH)).toBe(true);
     });
 
@@ -72,6 +82,17 @@ describe('ZAIChatServiceProvider', () => {
 
     it('should return false for glm-5', () => {
       expect(provider.supportsVisionForModel(MODEL_GLM_5)).toBe(false);
+    });
+
+    it('should return false for glm-5.1', () => {
+      expect(provider.supportsVisionForModel(MODEL_GLM_5_1)).toBe(false);
+    });
+
+    it('should return false for glm-5.2', () => {
+      expect(provider.supportsVisionForModel(MODEL_GLM_5_2)).toBe(false);
+      expect(provider.getVisionSupportLevelForModel(MODEL_GLM_5_2)).toBe(
+        'unsupported',
+      );
     });
 
     it('should return false for glm-5-turbo', () => {
@@ -92,7 +113,7 @@ describe('ZAIChatServiceProvider', () => {
 
       expect(ZAIChatService).toHaveBeenCalledWith(
         'test-api-key',
-        MODEL_GLM_4_7,
+        MODEL_GLM_5_2,
         MODEL_GLM_4_6V_FLASH,
         undefined,
         ENDPOINT_ZAI_CHAT_COMPLETIONS_API,
@@ -105,15 +126,15 @@ describe('ZAIChatServiceProvider', () => {
     it('should use vision model when main model supports vision', () => {
       const options: ZAIChatServiceOptions = {
         apiKey: 'test-api-key',
-        model: MODEL_GLM_4_6V_FLASH,
+        model: MODEL_GLM_5V_TURBO,
       };
 
       provider.createChatService(options);
 
       expect(ZAIChatService).toHaveBeenCalledWith(
         'test-api-key',
-        MODEL_GLM_4_6V_FLASH,
-        MODEL_GLM_4_6V_FLASH,
+        MODEL_GLM_5V_TURBO,
+        MODEL_GLM_5V_TURBO,
         undefined,
         ENDPOINT_ZAI_CHAT_COMPLETIONS_API,
         undefined,

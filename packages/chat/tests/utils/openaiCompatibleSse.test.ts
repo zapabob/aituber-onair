@@ -56,6 +56,42 @@ describe('openaiCompatibleSse', () => {
     expect(onJsonError).toHaveBeenCalledTimes(1);
   });
 
+  it('should throw text stream errors when enabled', async () => {
+    const res = createSseResponse([
+      'data: {"error":{"code":502,"message":"Provider disconnected"},"choices":[{"delta":{"content":""},"finish_reason":"error"}]}\n\n',
+    ]);
+
+    await expect(
+      parseOpenAICompatibleTextStream(res, () => {}, {
+        throwOnApiError: true,
+      }),
+    ).rejects.toThrow('Provider response error: Provider disconnected');
+  });
+
+  it('should throw tool stream errors when enabled', async () => {
+    const res = createSseResponse([
+      'data: {"error":{"code":429,"message":"Provider overloaded"},"choices":[{"delta":{"content":""},"finish_reason":"error"}]}\n\n',
+    ]);
+
+    await expect(
+      parseOpenAICompatibleToolStream(res, () => {}, {
+        throwOnApiError: true,
+      }),
+    ).rejects.toThrow('Provider response error: Provider overloaded');
+  });
+
+  it('should throw one-shot errors when enabled', () => {
+    expect(() =>
+      parseOpenAICompatibleOneShot(
+        {
+          error: { code: 502, message: 'Provider disconnected' },
+          choices: [{ message: { content: '' }, finish_reason: 'error' }],
+        },
+        { throwOnApiError: true },
+      ),
+    ).toThrow('Provider response error: Provider disconnected');
+  });
+
   it('should parse streaming tool calls with arguments spanning chunks', async () => {
     const onPartial = vi.fn();
     const firstPayload = JSON.stringify({
@@ -94,7 +130,9 @@ describe('openaiCompatibleSse', () => {
       'data: [DONE]\n\n',
     ]);
 
-    const result = await parseOpenAICompatibleToolStream(res, onPartial);
+    const result = await parseOpenAICompatibleToolStream(res, onPartial, {
+      preserveAssistantMessage: true,
+    });
 
     expect(onPartial).not.toHaveBeenCalled();
     expect(result.stop_reason).toBe('tool_use');
@@ -106,6 +144,20 @@ describe('openaiCompatibleSse', () => {
         input: { city: 'Tokyo' },
       },
     ]);
+    expect(result.assistant_message).toEqual({
+      role: 'assistant',
+      content: '',
+      tool_calls: [
+        {
+          id: 'call_1',
+          type: 'function',
+          function: {
+            name: 'getWeather',
+            arguments: '{"city":"Tokyo"}',
+          },
+        },
+      ],
+    });
   });
 
   it('should keep text blocks when streaming tool arguments are invalid JSON', async () => {
@@ -173,6 +225,41 @@ describe('openaiCompatibleSse', () => {
     expect(result.blocks).toEqual([
       { type: 'tool_use', id: 'call_2', name: 'search', input: { q: 'hello' } },
     ]);
+  });
+
+  it('should preserve a complete one-shot assistant message when requested', () => {
+    const message = {
+      role: 'assistant',
+      content: 'Calling search. ',
+      reasoning_content: 'A search is required.',
+      tool_calls: [
+        {
+          id: 'call_3',
+          type: 'function',
+          function: {
+            name: 'search',
+            arguments: JSON.stringify({ q: 'Kimi K3' }),
+          },
+        },
+      ],
+    };
+
+    const result = parseOpenAICompatibleOneShot(
+      {
+        choices: [{ finish_reason: 'tool_calls', message }],
+      },
+      { preserveAssistantMessage: true },
+    );
+
+    expect(result.blocks).toEqual([
+      {
+        type: 'tool_use',
+        id: 'call_3',
+        name: 'search',
+        input: { q: 'Kimi K3' },
+      },
+    ]);
+    expect(result.assistant_message).toEqual(message);
   });
 
   it('should fall back to empty input for invalid one-shot tool arguments', () => {

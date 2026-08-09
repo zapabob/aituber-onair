@@ -66,7 +66,7 @@ pnpm install @aituber-onair/core
 - **Conversation Context Management & Memory**  
   Maintains long-running conversation context via short-, mid-, and long-term memory systems.
 - **Text-to-Speech Conversion**  
-  Compatible with multiple speech engines (VOICEVOX, VoicePeak, AivisSpeech, Aivis Cloud, OpenAI TTS, Gemini TTS, xAI, Unreal Speech, ElevenLabs, Inworld, Gradium, Piper Plus).
+  Compatible with multiple speech engines (VOICEVOX, VoicePeak, AivisSpeech, Aivis Cloud, OpenAI TTS, Gemini TTS, xAI, Unreal Speech, ElevenLabs, Inworld, Gradium, Piper Plus, Web Speech API).
 - **Emotion Extraction & Processing**  
   Extracts emotion from AI responses and utilizes it for speech synthesis or avatar expressions.
 - **Event-Driven Architecture**  
@@ -1227,6 +1227,10 @@ Possible use cases for `chatLogUpdated` include:
 - **OpenAI-Compatible TTS**: Self-hosted or third-party `/v1/audio/speech` compatible endpoints.
 - **MiniMax**: Multi-language TTS with 24 language support and HD quality (requires both API key and GroupId - see usage example below).
 - **Piper Plus**: Browser WASM TTS using ONNX Runtime Web and OpenJTalk assets for on-device synthesis.
+- **Web Speech API**: Browser-native speech synthesis with runtime voice-list
+  discovery and configurable rate, pitch, volume, and language. It plays audio
+  directly through the browser and does not expose audio bytes, so the Core
+  React examples do not support audio-buffer-based lip sync with this engine.
 - **None**: No voice mode (no audio output).
 
 You can dynamically switch the speech engine via `updateVoiceService`:
@@ -1381,23 +1385,25 @@ This is useful when running voice engines on different ports or remote servers.
 AITuber OnAir Core adopts an extensible provider system, enabling integration with various AI APIs.
 Currently, OpenAI API, OpenAI-compatible APIs, Gemini API, Gemini Nano
 (Chrome Built-in AI), Claude API, xAI API, Z.ai API, Kimi API, and OpenRouter
-API are available. If you would like to use any other API, please submit a PR
-or send us a message.
+API, DeepSeek API, Mistral API, Sakana AI, and PLaMo are available. If you
+would like to use any other API, please submit a PR or send us a message.
 
 ### Available Providers
 
 Currently, the following AI provider is built-in:
 
-- **OpenAI**: Supports models like GPT-5 family (Nano/Mini/Standard/5.1/5.4/5.5/5.4 Mini/5.4 Nano/5.4 Pro), GPT-4.1 (including Mini/Nano), GPT-4o, GPT-4o-mini, O3-mini, o1, o1-mini
-- **Gemini**: Supports models like Gemini 3.5 Flash, Gemini 3.1 Flash-Lite, Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemma 4 31B IT, and Gemma 4 26B A4B IT. Gemini 3.5 Flash automatically uses minimal thinking for chat-style responses; deprecated lifecycle models remain exported for explicit compatibility.
+- **OpenAI**: Supports models like GPT-5 family (Nano/Mini/Standard/5.1/5.4/5.5/5.6 Sol/Terra/Luna/5.4 Mini/5.4 Nano/5.4 Pro), GPT-4.1 (including Mini/Nano), GPT-4o, GPT-4o-mini, O3-mini, o1, o1-mini. GPT-5.6 models also support `max` reasoning effort.
+- **Gemini**: Supports models like Gemini 3.6 Flash, Gemini 3.5 Flash / Flash-Lite, Gemini 3.1 Flash-Lite, Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemma 4 31B IT, and Gemma 4 26B A4B IT. Gemini 3 Flash-family models support configurable `reasoning_effort`; Flash models default to `minimal` and Pro models default to `low` for chat-style responses. Gemini 2.5 continues to use `thinkingBudget` instead.
 - **Gemini Nano**: Supports the built-in Chrome `gemini-nano` model without an API key (Chrome 138+ with Prompt API flags enabled)
-- **Claude**: Supports current Claude API model IDs including Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 4.6, Claude Sonnet 4.5, Claude Haiku 4.5, plus deprecated-but-still-available Claude 4 Opus, Claude 4 Sonnet, and Claude 3 Haiku
-- **xAI**: Supports Grok 4.3, Grok 4.20, and Grok 4.1 Fast model families
-- **DeepSeek**: Supports DeepSeek V4 Flash and DeepSeek V4 Pro through the first-class `deepseek` provider.
-- **Mistral**: Supports current Mistral generalist models such as `mistral-small-latest`, `mistral-medium-3-5`, and `mistral-large-latest`, including vision-capable model metadata and adjustable reasoning for supported models.
-- **Z.ai**: Supports models like GLM-5/GLM-5-Turbo (text-only), GLM-4.7, GLM-4.7 Flash/FlashX, GLM-4.6, GLM-4.6V, GLM-4.6V Flash/FlashX
-- **Kimi**: Supports Kimi K2.6 (`kimi-k2.6`) and Kimi K2.5 (`kimi-k2.5`) with vision support
-- **OpenRouter**: Supports a curated OpenRouter model list, including Auto Router, Fusion, latest-family aliases, OpenAI GPT-5.5, Claude, Gemini, Z.ai, and Kimi. Fusion runs a multi-model panel plus a judge model, so usage is billed as the sum of the underlying model calls and any enabled web search/fetch usage.
+- **Claude**: Supports current Claude API model IDs including Claude Opus 5, Claude Sonnet 5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 4.6, Claude Sonnet 4.5, and Claude Haiku 4.5, plus deprecated-but-still-available Claude 4 Opus, Claude 4 Sonnet, and Claude 3 Haiku. Supported models accept `reasoning_effort`, which maps to Anthropic's `output_config.effort`; the API default is `high`.
+- **xAI**: Supports Grok 4.5, Grok 4.3, Grok 4.20, and Grok 4.1 Fast model families. Grok 4.5 supports configurable `reasoning_effort` and defaults to `low`; Grok 4.3 defaults to `none` for lower latency.
+- **DeepSeek**: Supports DeepSeek V4 Flash and DeepSeek V4 Pro through the first-class `deepseek` provider. Both expose model-aware `reasoning_effort`; Core keeps Chat's low-latency `none` default, while higher supported efforts remain selectable. Thinking and tool calling cannot currently be combined in one request.
+- **Mistral**: Supports the vision-capable Ministral 3 family (`ministral-3b-2512`, `ministral-8b-2512`, `ministral-14b-2512`) and current Mistral generalist models such as `mistral-small-latest`, `mistral-medium-3-5`, and `mistral-large-latest`, including adjustable reasoning for supported models.
+- **Sakana AI**: Supports Fugu (`fugu`) and Fugu Ultra (`fugu-ultra`, `fugu-ultra-20260615`) through the first-class `sakana` provider. Browser examples show this provider as disabled because direct browser requests can fail with CORS; use Node.js or a backend proxy.
+- **PLaMo**: Supports PLaMo 3.0 Prime (`plamo-3.0-prime`) and PLaMo 2.2 Prime (`plamo-2.2-prime`) through the first-class `plamo` provider.
+- **Z.ai**: Supports GLM-5.2, GLM-5.1, GLM-5/GLM-5-Turbo (text-only), GLM-5V-Turbo (vision), GLM-4.7, GLM-4.7 Flash/FlashX, GLM-4.6, GLM-4.6V, and GLM-4.6V Flash/FlashX.
+- **Kimi**: Supports Kimi K3 (`kimi-k3`), Kimi K2.7 Code (`kimi-k2.7-code`), Kimi K2.7 Code HighSpeed (`kimi-k2.7-code-highspeed`), Kimi K2.6 (`kimi-k2.6`), and Kimi K2.5 (`kimi-k2.5`) with vision support. Models that expose `reasoning_effort` use their documented supported values and defaults: Kimi K3 accepts `low`, `high`, and `max`, defaults to `max`, and cannot disable reasoning. Kimi K2.7 Code models require thinking mode.
+- **OpenRouter**: Supports a curated OpenRouter model list, including Auto Router and Auto Router Beta, Fusion, latest-family aliases, OpenAI GPT-5.6, Claude Opus 5, Gemini 3.6/3.5, Z.ai GLM-5.2, xAI Grok 4.5, Kimi K3, KAT-Coder V2.5, and DeepSeek V4 Flash. For DeepSeek, use the fixed `deepseek/deepseek-v4-flash-0731` model for reproducible current behavior; `deepseek/deepseek-v4-flash` remains the separate preview snapshot. Both expose model-aware reasoning efforts and default to an explicit `none` for responsive chat. Dynamic routers omit `responseLength`-derived token limits because a routed reasoning model can consume the output budget before emitting visible text; explicitly supplied `maxTokens` values remain effective. Models with stricter upstream constraints remain explicit options: Kimi K3 can return 429 when upstream capacity is constrained, and Grok 4.5 has region-specific availability limits. Fusion usage is billed as the sum of its underlying model calls and any enabled web search/fetch usage. OpenRouter GLM-5.2 inherits chat's default `reasoning.effort: 'none'` and omits automatic `max_tokens`.
 - **OpenAI-Compatible**: Supports arbitrary OpenAI-compatible Chat Completions endpoints; vision capability is treated as unknown until the target endpoint/model responds
 
 For OpenRouter free-tier discovery, you can also use

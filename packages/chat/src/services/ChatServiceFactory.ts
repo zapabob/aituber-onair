@@ -7,6 +7,33 @@ import {
   VisionSupportLevel,
 } from './providers/ChatServiceProvider';
 import { DEFAULT_CHAT_SERVICE_PROVIDERS } from './providers';
+import type { ChatProviderCapabilities } from '../types/capabilities';
+import { getClaudeSupportedReasoningEfforts } from '../constants/claude';
+import { getKimiSupportedReasoningEfforts } from '../constants/kimi';
+import { getDeepSeekSupportedReasoningEfforts } from '../constants/deepseek';
+import { getOpenRouterSupportedReasoningEfforts } from '../constants/openrouter';
+import { getChatBackendProviderCapabilities } from '../backend';
+
+const MCP_SUPPORTED_PROVIDERS = new Set<string>(['openai', 'gemini', 'claude']);
+
+const JSON_MODE_SUPPORTED_PROVIDERS = new Set<string>([
+  'openai',
+  'openai-compatible',
+  'zai',
+  'kimi',
+]);
+
+const REASONING_EFFORT_BY_PROVIDER: Record<string, string[]> = {
+  openai: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+  claude: ['low', 'medium', 'high', 'xhigh', 'max'],
+  gemini: ['minimal', 'low', 'medium', 'high'],
+  openrouter: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+  kimi: ['low', 'high', 'max'],
+  mistral: ['low', 'medium', 'high'],
+  plamo: ['none', 'medium'],
+  xai: ['none', 'low', 'medium', 'high'],
+  deepseek: ['none', 'low', 'high', 'max'],
+};
 
 /**
  * Chat service factory
@@ -69,6 +96,63 @@ export class ChatServiceFactory {
   static getSupportedModels(providerName: string): string[] {
     const provider = this.providers.get(providerName);
     return provider ? provider.getSupportedModels() : [];
+  }
+
+  /**
+   * Get machine-readable provider capabilities for UI and agent planning.
+   */
+  static getProviderCapabilities(
+    providerName: string,
+    model?: string,
+  ): ChatProviderCapabilities | undefined {
+    const provider = this.providers.get(providerName);
+    if (!provider) {
+      return undefined;
+    }
+
+    const vision = model
+      ? this.getVisionSupportLevelForModel(providerName, model)
+      : provider.getVisionSupportLevel();
+    const backendCapabilities =
+      getChatBackendProviderCapabilities(providerName);
+
+    return {
+      provider: providerName,
+      models: provider.getSupportedModels(),
+      defaultModel:
+        typeof provider.getDefaultModel === 'function'
+          ? provider.getDefaultModel()
+          : undefined,
+      text: true,
+      streaming: backendCapabilities?.streaming ?? true,
+      vision,
+      tools: backendCapabilities?.tools ?? false,
+      mcp: MCP_SUPPORTED_PROVIDERS.has(providerName),
+      jsonMode: JSON_MODE_SUPPORTED_PROVIDERS.has(providerName),
+      responseLength: true,
+      reasoningEffort:
+        providerName === 'claude' && model
+          ? [...getClaudeSupportedReasoningEfforts(model)]
+          : providerName === 'kimi' && model
+            ? [...getKimiSupportedReasoningEfforts(model)]
+            : providerName === 'deepseek' && model
+              ? [...getDeepSeekSupportedReasoningEfforts(model)]
+              : providerName === 'openrouter' && model
+                ? [...getOpenRouterSupportedReasoningEfforts(model)]
+                : (REASONING_EFFORT_BY_PROVIDER[providerName] ?? []),
+    };
+  }
+
+  /**
+   * Get machine-readable capabilities for all registered providers.
+   */
+  static getAllProviderCapabilities(): ChatProviderCapabilities[] {
+    return this.getAvailableProviders()
+      .map((providerName) => this.getProviderCapabilities(providerName))
+      .filter(
+        (capabilities): capabilities is ChatProviderCapabilities =>
+          capabilities !== undefined,
+      );
   }
 
   /**

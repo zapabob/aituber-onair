@@ -2,14 +2,18 @@ export const ENDPOINT_XAI_CHAT_COMPLETIONS_API =
   'https://api.x.ai/v1/chat/completions';
 
 // xAI Grok models
+export const MODEL_GROK_4_5 = 'grok-4.5';
 export const MODEL_GROK_4_3 = 'grok-4.3';
 export const MODEL_GROK_4_20_REASONING = 'grok-4.20-0309-reasoning';
 export const MODEL_GROK_4_20_NON_REASONING = 'grok-4.20-0309-non-reasoning';
 export const MODEL_GROK_4_1_FAST_REASONING = 'grok-4-1-fast-reasoning';
 export const MODEL_GROK_4_1_FAST_NON_REASONING = 'grok-4-1-fast-non-reasoning';
 
+export type XaiReasoningEffort = 'none' | 'low' | 'medium' | 'high';
+
 // Vision support for models
 export const XAI_VISION_SUPPORTED_MODELS = [
+  MODEL_GROK_4_5,
   MODEL_GROK_4_3,
   MODEL_GROK_4_20_REASONING,
   MODEL_GROK_4_20_NON_REASONING,
@@ -22,4 +26,49 @@ export const XAI_VISION_SUPPORTED_MODELS = [
  */
 export function isXaiVisionModel(model: string): boolean {
   return XAI_VISION_SUPPORTED_MODELS.includes(model);
+}
+
+/**
+ * Check if a model supports the xAI reasoning_effort parameter
+ */
+export function isXaiReasoningEffortModel(model: string): boolean {
+  return model === MODEL_GROK_4_5 || model === MODEL_GROK_4_3;
+}
+
+/**
+ * Check if a model supports disabling reasoning with reasoning_effort none
+ */
+export function isXaiReasoningEffortNoneModel(model: string): boolean {
+  return model === MODEL_GROK_4_3;
+}
+
+/**
+ * Get default reasoning effort for xAI models
+ */
+export function getDefaultXaiReasoningEffort(
+  model: string,
+): XaiReasoningEffort | undefined {
+  if (model === MODEL_GROK_4_5) {
+    return 'low';
+  }
+
+  return isXaiReasoningEffortNoneModel(model) ? 'none' : undefined;
+}
+
+/**
+ * Normalize xAI reasoning_effort for each model's documented support
+ */
+export function normalizeXaiReasoningEffort(
+  model: string,
+  reasoningEffort?: XaiReasoningEffort,
+): XaiReasoningEffort | undefined {
+  if (!isXaiReasoningEffortModel(model)) {
+    return undefined;
+  }
+
+  if (reasoningEffort === 'none' && !isXaiReasoningEffortNoneModel(model)) {
+    return 'low';
+  }
+
+  return reasoningEffort ?? getDefaultXaiReasoningEffort(model);
 }

@@ -1,5 +1,9 @@
 # VRM Chat
 
+Web Speech API TTS is available with browser voice selection and rate, pitch,
+volume, and language controls. Because the browser plays it directly without
+exposing audio bytes, lip sync is not supported when this engine is selected.
+
 ![react-vrm-app image](./images/react-vrm-app.png)
 
 A VRM avatar chat app built with `@aituber-onair/core`.  
@@ -10,11 +14,15 @@ from actual audio output volume.
 
 - Chat with LLM providers:
   `openai`, `openai-compatible`, `openrouter`, `gemini`, `gemini-nano`,
-  `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`
+  `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`,
+  `sakana` (disabled in browser UI), `plamo`
+- xAI Grok 4.5 exposes `reasoning_effort` and defaults to `low`; Grok 4.3 defaults to `none` for lower latency
 - Provider model lists are sourced from `@aituber-onair/core`, so newly synced
-  chat models such as Claude Opus 4.8, Gemini 3.5 Flash, and GPT-5.5 are available automatically
+  chat models such as Gemini 3.6 Flash, Kimi K3, Ministral 3, GLM-5V-Turbo,
+  and GPT-5.6 are available automatically
   in Settings
-- Gemini 3.5 Flash automatically uses minimal thinking for chat-style responses
+- Gemini 3 Flash-family models use minimal thinking by default for chat-style
+  responses; Gemini 3 Pro uses low
 - `gpt-5.5-pro` is intentionally omitted because OpenAI documents it as
   non-streaming, while this example uses the standard streaming chat flow
 - For `openrouter`, fetch currently working `:free` models from Settings:
@@ -24,7 +32,7 @@ from actual audio output volume.
 - Use TTS engines:
   `openai`, `geminiTts`, `openaiCompatible`, `voicevox`, `voicepeak`,
   `aivisSpeech`, `aivisCloud`, `minimax`, `xai`, `unrealSpeech`,
-  `elevenLabs`, `inworld`, `gradium`, `piperPlus`, `none`
+  `elevenLabs`, `inworld`, `gradium`, `piperPlus`, `webSpeech`, `none`
 - `geminiTts` defaults to `gemini-3.1-flash-tts-preview` and exposes 30
   prebuilt voices plus style/audio-tag prompt input
 - Fetch and select speaker lists dynamically:
@@ -39,16 +47,28 @@ from actual audio output volume.
 - `piperPlus` expects browser assets under `public/piper/`
 - Render a VRM avatar (`miko.vrm`) with optional idle VRMA animation
 - Real-time lip-sync for VRM expression (`Aa`)
+- Configure emotion-to-effect mappings in **Settings → 感情表現エフェクト**
+  and choose disabled, manual preview, or response-emotion-linked control
+- Display the same layered emotion effects as the PSD/PuruPuru samples, such as
+  background auras, sparkles, tears, and emotion marks, as soon as a response
+  emotion is received, independently of TTS playback
+- Adjust face and eye anchors and effect size in manual mode; the anchors follow
+  the VRM camera view and are saved for the avatar
+- Add subtle randomized idle expressions while the avatar is not speaking
 - Control camera on the avatar stage:
   drag to rotate / mouse wheel to zoom / double-click to reset
 - Set visuals directly in Settings:
   - Background image upload (PNG/JPG, memory-only)
+  - Green screen background mode
+  - Broadcast layout with avatar-only captions
   - Fixed avatar asset path display (`/avatar/miko.vrm`)
 - Fetch live chat comments from YouTube Live or Twitch, analyze them with
   `@aituber-onair/comment-intelligence`, and send only selected comments into
   the LLM pipeline
   - YouTube uses the YouTube Data API v3 (requires a Google Cloud API key)
   - Twitch uses EventSub WebSocket with a browser-based implicit OAuth flow
+- Capture one frame from OBS Virtual Camera in **Settings → Screen Vision** and
+  send it to a vision-capable model for an avatar comment
 - Detect repetitive conversation patterns with `@aituber-onair/manneri` and
   add an internal topic-diversification instruction before the next response
 
@@ -62,6 +82,9 @@ npm run dev
 
 After launch, open **Settings** and set API keys / provider options.  
 All settings are saved in `localStorage` (`react-vrm-app-settings`).
+The LLM section also lets you edit the system prompt. It is applied when the
+field loses focus. Keep the default emotion-tag instruction if you want visual
+effects to follow the response.
 
 For `openai-compatible`, set:
 - `Endpoint URL` (required, full `/v1/chat/completions` URL)
@@ -73,6 +96,21 @@ For `gemini-nano`, set:
 - `#optimization-guide-on-device-model`
 - `#prompt-api-for-gemini-nano`
 - No API key is required
+
+## Screen Vision
+
+Start OBS Virtual Camera, choose it from **Settings → Screen Vision**, then press
+**画面を見る** to send the current frame to the selected vision-capable model.
+You can also choose an automatic interval such as 30 seconds, 1 minute,
+2 minutes, or 5 minutes.
+
+## Broadcast visuals
+
+Use **Settings → Visual** to switch the background to green screen and select
+the solo broadcast layout. In solo broadcast layout, the normal chat log is
+hidden and only the avatar's latest spoken text is shown as a lower caption.
+The user input field is hidden by default, but can be enabled in the same
+Visual settings section.
 
 ## Stream comments (YouTube Live / Twitch)
 
@@ -216,7 +254,7 @@ Place these files in `public/avatar/`:
 
 | File | Required | Description |
 |---|---|---|
-| `miko.vrm` | Yes | VRM model loaded by the viewer |
+| `miko.vrm` | Yes | VRM model loaded by the viewer, including optional expression presets for this sample |
 | `idle_loop.vrma` | Optional | Idle animation clip (if missing, only animation is skipped) |
 
 Notes:
@@ -227,6 +265,11 @@ Notes:
 
 If `miko.vrm` is missing or invalid, the app shows a load error on the
 avatar stage.
+
+The bundled model includes optional expressions such as `happy`, `sad`,
+`surprised`, `mouthSmileLeft`, and `browInnerUp`. When users replace it with a
+different VRM, unsupported expressions are ignored and the app falls back to the
+available expressions and lip-sync behavior.
 
 ## Lip-sync tuning
 
@@ -252,3 +295,12 @@ You can tune constants in `src/hooks/useAudioLipsync.ts`:
 - `three`, `@pixiv/three-vrm`, `@pixiv/three-vrm-animation`
 - Web Speech API (speech input)
 - Web Audio API + `AnalyserNode` (lip-sync analysis)
+
+## Bundled Miko asset terms
+
+The default VRM model depicts Miko, the official character of AITuber OnAir.
+It is not covered by the software's MIT License. See
+[Miko Asset Terms](./MIKO_ASSET_TERMS.md) for a link to the
+authoritative Japanese guidelines. The asset may be distributed as an integral part of a
+work or other content, but standalone redistribution and asset collections are
+prohibited.

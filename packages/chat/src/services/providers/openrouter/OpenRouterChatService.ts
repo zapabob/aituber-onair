@@ -4,6 +4,12 @@ import { ToolDefinition, ToolChatCompletion } from '../../../types';
 import {
   ENDPOINT_OPENROUTER_API,
   MODEL_GPT_OSS_20B_FREE,
+  MODEL_OPENROUTER_AUTO,
+  MODEL_OPENROUTER_AUTO_BETA,
+  MODEL_ZAI_GLM_5_2,
+  type OpenRouterReasoningEffort,
+  getDefaultOpenRouterReasoningEffort,
+  normalizeOpenRouterReasoningEffort,
   isOpenRouterVisionModel,
   isOpenRouterFreeModel,
   OPENROUTER_FREE_RATE_LIMIT_PER_MINUTE,
@@ -21,8 +27,27 @@ import {
   processChatWithOptionalTools,
 } from '../../../utils';
 
+const isOpenRouterAutoModel = (model: string): boolean =>
+  [MODEL_OPENROUTER_AUTO, MODEL_OPENROUTER_AUTO_BETA].includes(model.trim());
+
 const isTokenLimitUnsupportedModel = (model: string): boolean =>
-  model.trim() === MODEL_GPT_OSS_20B_FREE;
+  [MODEL_GPT_OSS_20B_FREE, MODEL_ZAI_GLM_5_2].includes(model.trim());
+
+const ensureAutoRouterOutput = (
+  model: string,
+  hasVisibleOutput: boolean,
+): void => {
+  if (isOpenRouterAutoModel(model) && !hasVisibleOutput) {
+    throw new Error(
+      'OpenRouter Auto Router returned no visible content. Please retry.',
+    );
+  }
+};
+
+const hasUsableCompletionOutput = (completion: ToolChatCompletion): boolean =>
+  completion.blocks.some(
+    (block) => block.type !== 'text' || block.text.trim().length > 0,
+  );
 
 /**
  * OpenRouter implementation of ChatService
@@ -40,7 +65,7 @@ export class OpenRouterChatService implements ChatService {
   private responseLength?: ChatResponseLength;
   private appName?: string;
   private appUrl?: string;
-  private reasoning_effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+  private reasoning_effort?: OpenRouterReasoningEffort;
   private includeReasoning?: boolean;
   private reasoningMaxTokens?: number;
   private lastRequestTime: number = 0;
@@ -69,7 +94,7 @@ export class OpenRouterChatService implements ChatService {
     responseLength?: ChatResponseLength,
     appName?: string,
     appUrl?: string,
-    reasoning_effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high',
+    reasoning_effort?: OpenRouterReasoningEffort,
     includeReasoning?: boolean,
     reasoningMaxTokens?: number,
   ) {
@@ -155,7 +180,7 @@ export class OpenRouterChatService implements ChatService {
       hasTools: this.tools.length > 0,
       runWithoutTools: async () => {
         const res = await this.callOpenRouter(messages, this.model, true);
-        return this.handleStream(res, onPartialResponse);
+        return this.handleStream(res, onPartialResponse, this.model);
       },
       runWithTools: () => this.chatOnce(messages, true, onPartialResponse),
       onCompleteResponse,
@@ -195,7 +220,7 @@ export class OpenRouterChatService implements ChatService {
             this.visionModel,
             true,
           );
-          return this.handleStream(res, onPartialResponse);
+          return this.handleStream(res, onPartialResponse, this.visionModel);
         },
         runWithTools: () =>
           this.visionChatOnce(messages, true, onPartialResponse),
@@ -232,8 +257,8 @@ export class OpenRouterChatService implements ChatService {
       maxTokens,
     );
     return stream
-      ? this.parseStream(res, onPartialResponse)
-      : this.parseOneShot(await res.json());
+      ? this.parseStream(res, onPartialResponse, this.model)
+      : this.parseOneShot(await res.json(), this.model);
   }
 
   /**
@@ -265,8 +290,8 @@ export class OpenRouterChatService implements ChatService {
       maxTokens,
     );
     return stream
-      ? this.parseStream(res, onPartialResponse)
-      : this.parseOneShot(await res.json());
+      ? this.parseStream(res, onPartialResponse, this.visionModel)
+      : this.parseOneShot(await res.json(), this.visionModel);
   }
 
   /**
@@ -319,32 +344,44 @@ export class OpenRouterChatService implements ChatService {
         ? maxTokens
         : getMaxTokensForResponseLength(this.responseLength);
 
-    // OpenRouter gpt-oss-20b has known issues with token limits causing empty responses.
-    if (tokenLimit && isTokenLimitUnsupportedModel(model)) {
+    // Dynamic routers and some reasoning models can spend the whole budget on
+    // reasoning tokens before emitting visible content.
+    const shouldOmitTokenLimit =
+      isTokenLimitUnsupportedModel(model) ||
+      (isOpenRouterAutoModel(model) && maxTokens === undefined);
+
+    if (tokenLimit && shouldOmitTokenLimit) {
       console.warn(
-        `OpenRouter: Token limits are not supported for ${model} due to known issues. Using unlimited tokens instead.`,
+        `OpenRouter: Token limits are disabled for ${model} because this model can return empty content when a token limit is set.`,
       );
     } else if (tokenLimit) {
       body.max_tokens = tokenLimit;
     }
 
     // Add OpenRouter reasoning control
+    const defaultReasoningEffort = getDefaultOpenRouterReasoningEffort(model);
+    const reasoningEffort = normalizeOpenRouterReasoningEffort(
+      model,
+      this.reasoning_effort,
+    );
     if (
-      this.reasoning_effort !== undefined ||
+      reasoningEffort !== undefined ||
       this.includeReasoning !== undefined ||
-      this.reasoningMaxTokens
+      this.reasoningMaxTokens ||
+      defaultReasoningEffort
     ) {
       body.reasoning = {};
 
-      if (this.reasoning_effort && this.reasoning_effort !== 'none') {
+      if (reasoningEffort) {
         // OpenRouter uses 'low' as the minimum effort level, map 'minimal' to 'low'
-        const effort =
-          this.reasoning_effort === 'minimal' ? 'low' : this.reasoning_effort;
+        const effort = reasoningEffort === 'minimal' ? 'low' : reasoningEffort;
         body.reasoning.effort = effort;
+      } else if (defaultReasoningEffort) {
+        body.reasoning.effort = defaultReasoningEffort;
       }
 
       // Default to exclude reasoning to avoid empty responses unless explicitly requested
-      if (this.reasoning_effort === 'none' || this.includeReasoning !== true) {
+      if (reasoningEffort === 'none' || this.includeReasoning !== true) {
         body.reasoning.exclude = true;
       }
 
@@ -372,11 +409,15 @@ export class OpenRouterChatService implements ChatService {
   private async handleStream(
     res: Response,
     onPartial: (t: string) => void,
+    model: string,
   ): Promise<string> {
-    return parseOpenAICompatibleTextStream(res, onPartial, {
+    const text = await parseOpenAICompatibleTextStream(res, onPartial, {
       onJsonError: (payload) =>
         console.debug('Failed to parse SSE data:', payload),
+      throwOnApiError: isOpenRouterAutoModel(model),
     });
+    ensureAutoRouterOutput(model, text.trim().length > 0);
+    return text;
   }
 
   /**
@@ -385,17 +426,25 @@ export class OpenRouterChatService implements ChatService {
   private async parseStream(
     res: Response,
     onPartial: (t: string) => void,
+    model: string,
   ): Promise<ToolChatCompletion> {
-    return parseOpenAICompatibleToolStream(res, onPartial, {
+    const completion = await parseOpenAICompatibleToolStream(res, onPartial, {
       onJsonError: (payload) =>
         console.debug('Failed to parse SSE data:', payload),
+      throwOnApiError: isOpenRouterAutoModel(model),
     });
+    ensureAutoRouterOutput(model, hasUsableCompletionOutput(completion));
+    return completion;
   }
 
   /**
    * Parse non-streaming response
    */
-  private parseOneShot(data: any): ToolChatCompletion {
-    return parseOpenAICompatibleOneShot(data);
+  private parseOneShot(data: any, model: string): ToolChatCompletion {
+    const completion = parseOpenAICompatibleOneShot(data, {
+      throwOnApiError: isOpenRouterAutoModel(model),
+    });
+    ensureAutoRouterOutput(model, hasUsableCompletionOutput(completion));
+    return completion;
   }
 }

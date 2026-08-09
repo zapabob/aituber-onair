@@ -1,9 +1,18 @@
+import { changedFinalSentence, scoreGenericity } from './genericity.js';
+import {
+  TEASING_INTERVENTIONS,
+  hasPlayMarker,
+  requiresPlayMarker,
+} from './playMarkers.js';
 import { scorePredictability } from './predictability.js';
 import { evaluateNoiseQuality } from './qualityEvaluator.js';
+import { CONCRETE_ACTION_EN_PATTERN } from './predictabilityDiagnosis.js';
 import type {
   CandidateEvaluation,
   ContextFingerprint,
   EvaluatedCandidate,
+  InterventionKind,
+  NoiseLexicon,
   NoiseMode,
   NoiseQualityOptions,
   RewriteCandidate,
@@ -19,11 +28,26 @@ export function evaluateRewriteCandidates(input: {
   context: ContextFingerprint;
   mode?: NoiseMode;
   qualityOptions?: NoiseQualityOptions;
+  /** Character's own recent outputs, used for the genericity penalty. */
+  recentResponses?: string[];
+  /**
+   * Interventions the plan actually authorized this turn. Candidates that
+   * claim interventions outside this set are penalized so the LLM cannot earn
+   * credit (or worse, tease) by over-claiming. When omitted, no plan-based
+   * penalty is applied.
+   */
+  plannedInterventions?: InterventionKind[];
+  /** Character/app-specific vocabulary extending the built-in lexicons. */
+  lexicon?: NoiseLexicon;
 }): EvaluatedCandidate[] {
   const beforePredictability = scorePredictability({
     draft: input.before,
     context: input.context,
+    lexicon: input.lexicon,
   });
+  const plannedKinds = input.plannedInterventions
+    ? new Set(input.plannedInterventions)
+    : undefined;
 
   return input.candidates.map((candidate) => {
     const quality = evaluateNoiseQuality({
@@ -31,6 +55,8 @@ export function evaluateRewriteCandidates(input: {
       after: candidate.text,
       context: input.context,
       options: input.qualityOptions,
+      appliedInterventions: candidate.appliedInterventions,
+      lexicon: input.lexicon,
     });
     const afterPredictability = quality.checks.predictabilityAfter;
     const evaluation = evaluateCandidate({
@@ -41,6 +67,10 @@ export function evaluateRewriteCandidates(input: {
       afterPredictability,
       qualityPassed: quality.passed,
       mode: input.mode ?? 'performer',
+      candidate,
+      recentResponses: input.recentResponses,
+      plannedKinds,
+      lexicon: input.lexicon,
     });
 
     return {
@@ -51,31 +81,44 @@ export function evaluateRewriteCandidates(input: {
   });
 }
 
-export function selectBestCandidate(candidates: EvaluatedCandidate[]): {
+export function selectBestCandidate(
+  candidates: EvaluatedCandidate[],
+  plannedInterventions?: InterventionKind[]
+): {
   candidate: EvaluatedCandidate;
   index: number;
 } {
+  const plannedKinds = plannedInterventions
+    ? new Set(plannedInterventions)
+    : undefined;
   const ranked = candidates
     .map((candidate, index) => ({ candidate, index }))
     .sort((left, right) => {
       return (
-        scoreForSelection(right.candidate) - scoreForSelection(left.candidate)
+        scoreForSelection(right.candidate, plannedKinds) -
+        scoreForSelection(left.candidate, plannedKinds)
       );
     });
 
   return ranked[0];
 }
 
-function scoreForSelection(candidate: EvaluatedCandidate): number {
+function scoreForSelection(
+  candidate: EvaluatedCandidate,
+  plannedKinds?: Set<InterventionKind>
+): number {
   const errorPenalty = candidate.quality.issues.some(
     (issue) => issue.severity === 'error'
   )
     ? 0.5
     : 0;
-  const interventionBonus = Math.min(
-    0.12,
-    candidate.appliedInterventions.length * 0.04
-  );
+  // Only planned-and-applied interventions earn the diversity bonus, so a
+  // candidate cannot climb the ranking by over-claiming interventions the
+  // plan never authorized.
+  const creditedInterventions = plannedKinds
+    ? candidate.appliedInterventions.filter((kind) => plannedKinds.has(kind))
+    : candidate.appliedInterventions;
+  const interventionBonus = Math.min(0.12, creditedInterventions.length * 0.04);
 
   return candidate.evaluation.finalScore + interventionBonus - errorPenalty;
 }
@@ -88,6 +131,10 @@ function evaluateCandidate(input: {
   afterPredictability: number;
   qualityPassed: boolean;
   mode: NoiseMode;
+  candidate: RewriteCandidate;
+  recentResponses?: string[];
+  plannedKinds?: Set<InterventionKind>;
+  lexicon?: NoiseLexicon;
 }): CandidateEvaluation {
   const issues: string[] = [];
   const predictabilityReduction = Math.max(
@@ -103,12 +150,26 @@ function evaluateCandidate(input: {
   const overAggressionRisk = scoreRisk(input.after, AGGRESSION_PATTERN);
   const ungroundedDetailRisk = scoreUngroundedDetailRisk(input);
   const overRewriteRisk = scoreOverRewriteRisk(input.before, input.after);
+  const genericityRisk = scoreGenericity({
+    text: input.after,
+    recentResponses: input.recentResponses,
+    lexicon: input.lexicon,
+  });
   const modeProfile = getModeEvaluationProfile(input.mode);
   const meaningPreservation = Math.max(
     0,
     1 - overRewriteRisk * modeProfile.meaningRiskWeight
   );
   const personaPreservation = Math.max(0, 1 - overAggressionRisk);
+  const missingPlayMarker =
+    requiresPlayMarker(input.candidate.appliedInterventions) &&
+    !hasPlayMarker(input.after, input.lexicon);
+  const unplanned = input.plannedKinds
+    ? scoreUnplannedInterventions(
+        input.candidate.appliedInterventions,
+        input.plannedKinds
+      )
+    : { penalty: 0, hasUnplanned: false, hasUnplannedTeasing: false };
 
   if (META_WORD_PATTERN.test(input.after)) {
     issues.push('meta_word');
@@ -126,6 +187,22 @@ function evaluateCandidate(input: {
     issues.push('unchanged');
   }
 
+  if (genericityRisk > 0.45) {
+    issues.push('generic_reply');
+  }
+
+  if (missingPlayMarker) {
+    issues.push('missing_play_marker');
+  }
+
+  if (unplanned.hasUnplanned) {
+    issues.push('unplanned_intervention');
+  }
+
+  if (unplanned.hasUnplannedTeasing) {
+    issues.push('unplanned_teasing_intervention');
+  }
+
   const finalScore =
     predictabilityReduction * 0.25 +
     contextGrounding * 0.2 +
@@ -134,8 +211,13 @@ function evaluateCandidate(input: {
     meaningPreservation * 0.2 -
     overAggressionRisk * 0.3 -
     ungroundedDetailRisk * 0.3 -
+    genericityRisk * 0.15 -
+    (missingPlayMarker ? 0.12 : 0) -
+    unplanned.penalty -
     overRewriteRisk * modeProfile.overRewritePenalty +
     noveltyBonus(overRewriteRisk, input.mode) +
+    (changedFinalSentence(input.before, input.after) ? 0.06 : 0) +
+    atypicalityBonus(input.candidate.typicality) +
     (input.qualityPassed ? 0.08 : -0.08);
 
   return {
@@ -147,9 +229,57 @@ function evaluateCandidate(input: {
     overAggressionRisk,
     ungroundedDetailRisk,
     overRewriteRisk,
+    genericityRisk,
     finalScore: Number(Math.max(0, Math.min(1, finalScore)).toFixed(3)),
     issues,
   };
+}
+
+/**
+ * Penalize candidates that claim interventions the plan never authorized.
+ * Teasing-class interventions (tsukkomi, withheld uptake, etc.) are socially
+ * risky, so an unauthorized teasing claim is penalized much harder than a
+ * benign one.
+ */
+function scoreUnplannedInterventions(
+  applied: InterventionKind[],
+  plannedKinds: Set<InterventionKind>
+): { penalty: number; hasUnplanned: boolean; hasUnplannedTeasing: boolean } {
+  let benignCount = 0;
+  let teasingCount = 0;
+
+  for (const kind of applied) {
+    if (plannedKinds.has(kind)) {
+      continue;
+    }
+
+    if (TEASING_INTERVENTIONS.has(kind)) {
+      teasingCount += 1;
+    } else {
+      benignCount += 1;
+    }
+  }
+
+  const penalty =
+    Math.min(0.2, benignCount * 0.1) + Math.min(0.5, teasingCount * 0.3);
+
+  return {
+    penalty,
+    hasUnplanned: benignCount > 0,
+    hasUnplannedTeasing: teasingCount > 0,
+  };
+}
+
+/**
+ * Verbalized-sampling style bonus: when the model reports how typical each
+ * candidate is, gently prefer the distribution tail.
+ */
+function atypicalityBonus(typicality: number | undefined): number {
+  if (typeof typicality !== 'number') {
+    return 0;
+  }
+
+  return (1 - typicality) * 0.04;
 }
 
 function getModeEvaluationProfile(mode: NoiseMode): {
@@ -229,7 +359,8 @@ function scoreSpecificity(text: string, context: ContextFingerprint): number {
   }
 
   if (
-    /ここで|先に|画面|音|コメント|質問|ゲーム|紹介|止め|切り替え/.test(text)
+    /ここで|先に|画面|音|コメント|質問|ゲーム|紹介|止め|切り替え/.test(text) ||
+    CONCRETE_ACTION_EN_PATTERN.test(text)
   ) {
     score += 0.35;
   }

@@ -2,11 +2,11 @@
 
 ![@aituber-onair/chat logo](https://github.com/shinshin86/aituber-onair/raw/main/packages/chat/images/aituber-onair-chat.png)
 
-Chat and LLM API integration library for AITuber OnAir. This package provides a unified interface for interacting with various AI chat providers including OpenAI, OpenAI-compatible, Claude, Gemini, Gemini Nano (Chrome built-in AI), OpenRouter, Z.ai, xAI, Kimi, DeepSeek, Mistral, and Agent SDK providers.
+Chat and LLM API integration library for AITuber OnAir. This package provides a unified interface for interacting with various AI chat providers including OpenAI, OpenAI-compatible, Claude, Gemini, Gemini Nano (Chrome built-in AI), OpenRouter, Z.ai, xAI, Kimi, DeepSeek, Mistral, Sakana AI, PLaMo, and Agent SDK providers.
 
 ## Features
 
-- 🤖 **Multiple AI Provider Support**: OpenAI, OpenAI-compatible, Claude (Anthropic), Google Gemini, Gemini Nano (Chrome built-in AI), OpenRouter, Z.ai, xAI, Kimi, DeepSeek, Mistral, and Agent SDK providers
+- 🤖 **Multiple AI Provider Support**: OpenAI, OpenAI-compatible, Claude (Anthropic), Google Gemini, Gemini Nano (Chrome built-in AI), OpenRouter, Z.ai, xAI, Kimi, DeepSeek, Mistral, Sakana AI, PLaMo, and Agent SDK providers
 - 🔄 **Unified Interface**: Consistent API across different providers
 - 🛠️ **Tool/Function Calling**: Support for AI function calling with automatic iteration
 - 💬 **Streaming Responses**: Real-time streaming chat responses
@@ -466,6 +466,8 @@ Notes:
 - Existing `openai` provider behavior is unchanged.
 
 `reasoning_effort` options differ per model:
+- `gpt-5.6` / `gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna`:
+  `'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'`
 - `gpt-5.4-pro`: `'medium' | 'high' | 'xhigh'` (Responses API only)
 - `gpt-5.5`: `'none' | 'low' | 'medium' | 'high' | 'xhigh'`
 - `gpt-5.4`: `'none' | 'low' | 'medium' | 'high' | 'xhigh'`
@@ -475,10 +477,14 @@ Notes:
 
 Defaults and normalization in this package:
 - Models that support `'none'` (`gpt-5.1`, `gpt-5.4`, `gpt-5.4-mini`,
-  `gpt-5.4-nano`, `gpt-5.5`) default to `'none'` for fast chat responses.
+  `gpt-5.4-nano`, `gpt-5.5`, and the GPT-5.6 family) default to `'none'`
+  for fast chat responses.
   Note that OpenAI's own default for some of these models is `'medium'`;
   this package intentionally prioritizes low latency.
-- Other GPT-5 models default to `'medium'`.
+- Earlier GPT-5 models (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`) use
+  `'minimal'` as the default reasoning effort for fast chat responses.
+- `gpt-5.4-pro` defaults to `'medium'`, which is its lowest supported
+  reasoning effort.
 - Values a model does not support are rounded to the nearest supported
   level instead of being reset (e.g. `'minimal'` on `gpt-5.4-nano`
   resolves to `'none'`, `'none'` on `gpt-5-nano` resolves to `'minimal'`,
@@ -491,7 +497,7 @@ Instead of tuning `reasoning_effort` and `verbosity` per model, you can set
 
 - `casual` – fastest responses (`reasoning_effort: 'minimal'`,
   `verbosity: 'low'`). On models without `'minimal'` this resolves to the
-  lowest supported effort (`'none'` on the GPT-5.1/5.4/5.5 family,
+  lowest supported effort (`'none'` on the GPT-5.1/5.4/5.5/5.6 family,
   `'medium'` on `gpt-5.4-pro`).
 - `balanced` – `reasoning_effort: 'medium'`, `verbosity: 'medium'`.
 - `expert` – `reasoning_effort: 'high'`, `verbosity: 'high'`.
@@ -518,7 +524,10 @@ Caveats:
 
 **Meet the GPT-5 family**
 
-- `gpt-5.5` – OpenAI's newest frontier model for complex professional work, with text and image input support and both Chat Completions and Responses API support.
+- `gpt-5.6` / `gpt-5.6-sol` – The GPT-5.6 flagship tier for complex professional work. `gpt-5.6` is an alias that routes to Sol.
+- `gpt-5.6-terra` – Balances GPT-5.6 intelligence and cost.
+- `gpt-5.6-luna` – GPT-5.6 tier for cost-sensitive, high-volume workloads.
+- `gpt-5.5` – Previous frontier model for complex professional work, with text and image input support and both Chat Completions and Responses API support.
 - `gpt-5.4-pro` – Highest-tier GPT-5.4 model. Use with Responses API only.
 - `gpt-5.4` – Previous GPT-5 generation model optimized for stronger coding, instruction following, and long-context agentic work.
 - `gpt-5.4-mini` – Faster GPT-5.4-class small model for coding, tool use, and multimodal workloads.
@@ -576,37 +585,69 @@ For CI/local deterministic runs, pair it with `examples/mock-openai-server`.
 ```typescript
 const claudeService = ChatServiceFactory.createChatService('claude', {
   apiKey: process.env.ANTHROPIC_API_KEY,
-  model: 'claude-opus-4-8'
+  model: 'claude-opus-5',
+  reasoning_effort: 'low'
 });
 ```
+
+`claude-opus-5` is available as an explicit high-capability option and is not
+the package default. Claude Opus 5 has adaptive thinking enabled by default.
+Supported Claude models accept `reasoning_effort`, which maps to Anthropic's
+`output_config.effort`. The Claude API defaults to `high` when it is omitted:
+
+- Claude Opus 5, Sonnet 5, Opus 4.8, and Opus 4.7:
+  `low`, `medium`, `high`, `xhigh`, or `max`.
+- Claude Opus 4.6 and Sonnet 4.6:
+  `low`, `medium`, `high`, or `max`.
+- Claude Opus 4.5: `low`, `medium`, or `high`.
+
+Lower effort prioritizes latency and token efficiency, but does not guarantee
+a shorter visible response. Use response-length prompting as well when concise
+output is required.
+For multi-turn tool calls, append the returned
+`completion.assistant_message` to history so its provider-native thinking and
+tool-use blocks are preserved.
 
 #### Google Gemini
 
 ```typescript
 const geminiService = ChatServiceFactory.createChatService('gemini', {
   apiKey: process.env.GOOGLE_API_KEY,
-  model: 'gemini-3.1-flash-lite'
+  model: 'gemini-3.1-flash-lite',
+  reasoning_effort: 'minimal'
 });
 ```
 
-`gemini-3.1-flash-lite` is the recommended stable Flash-Lite model. Deprecated
+`gemini-3.1-flash-lite` remains the default Flash-Lite model.
+`gemini-3.5-flash-lite` is available as the latest stable, low-latency
+Flash-Lite option, while `gemini-3.6-flash` is available for stronger agentic
+and multimodal tasks. Deprecated
 preview and shutdown-scheduled models such as `gemini-3.1-flash-lite-preview`,
 `gemini-3-pro-preview`, and `gemini-2.5-flash-lite-preview-06-17` remain usable
 by explicit model string for backward compatibility, but are no longer
 advertised in the standard supported-model list for production use.
-`gemini-3.5-flash` is also available as the current stable Flash model.
+`gemini-3.5-flash` is also available as a stable Flash model.
 
-For chat-style usage, `gemini-3.5-flash` automatically sends Gemini
-`thinkingConfig` with `thinkingLevel: 'MINIMAL'` and `includeThoughts: false`.
-No user-facing option is required; this keeps default chat responses fast and
-reduces hidden thinking token usage.
+Gemini 3 models accept `reasoning_effort`, which maps to Gemini
+`thinkingConfig.thinkingLevel` while keeping `includeThoughts: false`:
+
+- Gemini 3 Flash / Flash-Lite: `minimal`, `low`, `medium`, or `high`;
+  defaults to `minimal` for low-latency chat.
+- Gemini 3 Pro: `low`, `medium`, or `high`; defaults to `low` because Pro does
+  not support `minimal`.
+
+This overrides the medium thinking default of Gemini 3.6/3.5 Flash and reduces
+the risk of hidden thinking exhausting short output limits. Gemini 2.5 uses
+`thinkingBudget` instead, so `reasoning_effort` is intentionally not sent for
+those models.
 
 #### OpenRouter
 
 ```typescript
 const openRouterService = ChatServiceFactory.createChatService('openrouter', {
   apiKey: process.env.OPENROUTER_API_KEY,
-  model: 'openai/gpt-oss-20b:free', // Free tier model
+  model: 'deepseek/deepseek-v4-flash-0731',
+  reasoning_effort: 'none', // Fastest chat-oriented setting
   // Optional: Add app information for analytics
   appName: 'Your App Name',
   appUrl: 'https://your-app-url.com'
@@ -614,25 +655,41 @@ const openRouterService = ChatServiceFactory.createChatService('openrouter', {
 ```
 
 **Important Notes for OpenRouter:**
-- Token limits are automatically disabled for the `gpt-oss-20b:free` model due to technical limitations
-- To control response length, include instructions in your prompt (e.g., "Please respond in 40 characters or less")
+- Automatic token limits from `responseLength` are disabled for `openrouter/auto` and `openrouter/auto-beta` because a routed reasoning model can spend the entire output budget before emitting visible content. An explicitly supplied `maxTokens` is still honored.
+- All token limits remain disabled for `gpt-oss-20b:free` and `z-ai/glm-5.2`. For these models and the dynamic routers, control response length with prompt instructions (e.g., "Please respond in 40 characters or less").
 - Free tier has rate limits (20 requests/minute)
 - Free tier detection is based on the model ID suffix `:free` (dynamic `:free` IDs are also rate-limited)
+- `openrouter/auto-beta` is a Beta task-aware router. It chooses a model for each request and charges that routed model's rate; inspect the response `model` field or OpenRouter Activity to see the selection.
 - `openrouter/fusion` runs a multi-model panel plus a judge model; OpenRouter bills the sum of the underlying model calls and any enabled web search/fetch usage, not a single fixed model rate.
+- For `z-ai/glm-5.2`, OpenRouter reasoning also defaults to `none`.
+- OpenRouter reasoning uses `reasoning.effort: 'none'` to disable reasoning. `exclude: true` only controls whether reasoning content is returned; it does not disable reasoning by itself.
+- DeepSeek V4 Flash snapshots are explicit text-only options rather than the OpenRouter default so applications can choose a reproducible version. Both default to `none` for responsive chat:
+  - `deepseek/deepseek-v4-flash-0731`: current fixed 0731 snapshot; supports `none`, `low`, `high`, and `max`.
+  - `deepseek/deepseek-v4-flash`: older unversioned 0423 snapshot; supports `none`, `high`, and `xhigh`.
+- Specialized coding models are explicit options rather than defaults. This includes `kwaipilot/kat-coder-air-v2.5` and `kwaipilot/kat-coder-pro-v2.5`, which are text-only.
+- `moonshotai/kimi-k3` availability depends on upstream capacity; OpenRouter may return 429 responses when capacity is constrained.
+- `x-ai/grok-4.5` has region-specific availability, including a current EU limitation. `~x-ai/grok-latest` inherits those limits when it resolves to Grok 4.5.
 - Supported models (curated list):
-  - `openrouter/auto`
+  - `openrouter/auto`, `openrouter/auto-beta`
   - `openrouter/fusion`
   - `openai/gpt-oss-20b:free`
-  - `~openai/gpt-latest`, `~openai/gpt-mini-latest`, `openai/gpt-5.5-pro`, `openai/gpt-5.5`
+  - `~openai/gpt-latest`, `~openai/gpt-mini-latest`
+  - `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`, `openai/gpt-5.6-luna`
+  - `openai/gpt-5.5-pro`, `openai/gpt-5.5`
   - `openai/gpt-5.1-chat`, `openai/gpt-5.1-codex`, `openai/gpt-5-mini`, `openai/gpt-5-nano`
   - `openai/gpt-4o`, `openai/gpt-4.1-mini`, `openai/gpt-4.1-nano`
   - `~anthropic/claude-sonnet-latest`, `~anthropic/claude-haiku-latest`
+  - `anthropic/claude-opus-5`
   - `anthropic/claude-opus-4`, `anthropic/claude-sonnet-4`
   - `anthropic/claude-3.7-sonnet`, `anthropic/claude-3.5-sonnet`, `anthropic/claude-haiku-4.5`
   - `~google/gemini-pro-latest`, `~google/gemini-flash-latest`
+  - `google/gemini-3.6-flash`, `google/gemini-3.5-flash-lite`
   - `google/gemini-2.5-pro`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite-preview-09-2025`
-  - `z-ai/glm-4.7-flash`, `z-ai/glm-4.5-air`, `z-ai/glm-4.5-air:free`
-  - `~moonshotai/kimi-latest`, `moonshotai/kimi-k2.5`
+  - `z-ai/glm-5.2`, `z-ai/glm-4.7-flash`, `z-ai/glm-4.5-air`, `z-ai/glm-4.5-air:free`
+  - `~x-ai/grok-latest`, `x-ai/grok-4.5`
+  - `deepseek/deepseek-v4-flash-0731`, `deepseek/deepseek-v4-flash`
+  - `~moonshotai/kimi-latest`, `moonshotai/kimi-k3`, `moonshotai/kimi-k2.7-code`, `moonshotai/kimi-k2.5`
+  - `kwaipilot/kat-coder-air-v2.5`, `kwaipilot/kat-coder-pro-v2.5`
 
 **Dynamic OpenRouter free model refresh**
 
@@ -666,7 +723,7 @@ Notes:
 ```typescript
 const zaiService = ChatServiceFactory.createChatService('zai', {
   apiKey: process.env.ZAI_API_KEY,
-  model: 'glm-5-turbo',
+  model: 'glm-5.2',
   visionModel: 'glm-4.6V-Flash', // Optional: vision-capable model
   responseFormat: { type: 'json_object' } // Optional JSON mode
 });
@@ -674,8 +731,8 @@ const zaiService = ChatServiceFactory.createChatService('zai', {
 
 Notes:
 - Z.ai uses OpenAI-compatible Chat Completions.
-- Supported text models: `glm-5`, `glm-5-turbo`, `glm-4.7`, `glm-4.7-FlashX`, `glm-4.7-Flash`, `glm-4.6`
-- Supported vision models: `glm-4.6V`, `glm-4.6V-FlashX`, `glm-4.6V-Flash`
+- Supported text models: `glm-5.2`, `glm-5.1`, `glm-5`, `glm-5-turbo`, `glm-4.7`, `glm-4.7-FlashX`, `glm-4.7-Flash`, `glm-4.6`
+- Supported vision models: `glm-5v-turbo`, `glm-4.6V`, `glm-4.6V-FlashX`, `glm-4.6V-Flash`
 - `thinking` is disabled by default to match fast response behavior.
 
 #### xAI (Grok)
@@ -683,33 +740,41 @@ Notes:
 ```typescript
 const xaiService = ChatServiceFactory.createChatService('xai', {
   apiKey: process.env.XAI_API_KEY,
-  model: 'grok-4.3',
-  visionModel: 'grok-4.3', // Optional: all xAI models support vision
+  model: 'grok-4.5',
+  reasoning_effort: 'low', // Optional for Grok 4.5: low, medium, high
+  visionModel: 'grok-4.3', // Optional: use a vision-capable xAI model
 });
 ```
 
 Notes:
 - xAI uses OpenAI-compatible Chat Completions.
-- Supported models: `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4-1-fast-reasoning`, `grok-4-1-fast-non-reasoning`
-- All supported xAI models support vision and tool/function calling.
+- Supported models: `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4-1-fast-reasoning`, `grok-4-1-fast-non-reasoning`
+- `reasoning_effort` is sent only for models that support it. `grok-4.5` supports `low`, `medium`, and `high` and defaults to `low` for chat-style responses. `grok-4.3` supports `none`, `low`, `medium`, and `high` and defaults to `none`.
+- Supported xAI models can be used with vision and tool/function calling. Grok 4.5 vision support is enabled so image chat can be validated directly in the React basic sample.
 
 #### Kimi (Moonshot)
 
 ```typescript
 const kimiService = ChatServiceFactory.createChatService('kimi', {
   apiKey: process.env.MOONSHOT_API_KEY,
-  model: 'kimi-k2.6',
+  model: 'kimi-k3',
   // Optional: override endpoint or baseUrl
   // endpoint: 'https://api.moonshot.ai/v1/chat/completions',
   // baseUrl: 'https://api.moonshot.ai/v1',
-  thinking: { type: 'enabled' }
+  reasoning_effort: 'low'
 });
 ```
 
 Notes:
 - Kimi uses OpenAI-compatible Chat Completions.
-- Supported models: `kimi-k2.6`, `kimi-k2.5`
-- When tools are enabled, `thinking` is forced to `{ type: 'disabled' }`.
+- Supported models: `kimi-k3`, `kimi-k2.7-code`, `kimi-k2.7-code-highspeed`, `kimi-k2.6`, `kimi-k2.5`
+- `kimi-k2.6` remains the default model for chat-oriented usage.
+- Kimi K3 is an explicit reasoning model. It accepts `reasoning_effort: 'low' | 'high' | 'max'`, defaults to `max`, always reasons, and does not accept the K2.x `thinking` option. `none`, `minimal`, and `medium` are not supported.
+- Kimi K3 uses `max_completion_tokens` for configured response limits.
+- For Kimi K3 multi-turn and tool-call flows, append the returned `completion.assistant_message` to history so `reasoning_content` and `tool_calls` are preserved.
+- Kimi K2.7 Code models are coding-oriented and require thinking mode, so they keep `thinking` enabled even when tools are used.
+- Explicitly setting `thinking: { type: 'disabled' }` with Kimi K2.7 Code models throws before sending the request.
+- For older Kimi models, when tools are enabled, `thinking` is forced to `{ type: 'disabled' }`.
 
 Self-hosted example:
 
@@ -730,6 +795,7 @@ Notes for self-hosted:
 const deepSeekService = ChatServiceFactory.createChatService('deepseek', {
   apiKey: process.env.DEEPSEEK_API_KEY,
   model: 'deepseek-v4-flash',
+  reasoning_effort: 'none', // Default: disable thinking for responsive chat
 });
 ```
 
@@ -738,7 +804,9 @@ Notes:
 - Recommended models: `deepseek-v4-flash` (default) and `deepseek-v4-pro`.
 - Legacy aliases `deepseek-chat` and `deepseek-reasoner` remain exported for explicit compatibility, but DeepSeek marks them deprecated and scheduled for removal on 2026-07-24.
 - You can still use DeepSeek through `openai-compatible` by providing the full endpoint and model manually, but the first-class `deepseek` provider supplies the endpoint and default model for you.
-- DeepSeek documents thinking/reasoning controls, but this package does not add DeepSeek-specific request parameters by default. Standard chat and streaming are prioritized here.
+- `deepseek-v4-flash` accepts `reasoning_effort: 'none' | 'low' | 'high' | 'max'`. The package defaults to `none`, mapped to `thinking: { type: 'disabled' }`, for responsive chat. Other levels enable thinking and are sent as DeepSeek `reasoning_effort`.
+- `deepseek-v4-pro` exposes `none`, `high`, and `max`. DeepSeek currently maps a requested `low` to `high`, so the package normalizes it explicitly.
+- Thinking with tool calling is intentionally rejected for now because DeepSeek requires `reasoning_content` replay across tool turns and does not accept the normal `tool_choice` request shape in thinking mode. Tool calling works with the default `none` setting.
 
 #### Mistral
 
@@ -758,7 +826,8 @@ await mistralService.processChat(
 Notes:
 - Mistral uses Chat Completions at `https://api.mistral.ai/v1/chat/completions`.
 - Default model: `mistral-small-latest`, chosen for the sample-friendly balance of low cost, strong general chat quality, vision support, and adjustable reasoning support.
-- Supported models: `mistral-small-latest`, `mistral-medium-3-5`, `mistral-large-latest`, `mistral-large-2512`, `mistral-small-2603`, `mistral-medium-2508`.
+- Supported models: `mistral-small-latest`, `ministral-3b-2512`, `ministral-8b-2512`, `ministral-14b-2512`, `mistral-medium-3-5`, `mistral-large-latest`, `mistral-large-2512`, `mistral-small-2603`, `mistral-medium-2508`.
+- Ministral 3 models support text, vision, streaming, and function calling through the same Chat Completions endpoint.
 - `reasoning_effort` is supported as `'none' | 'high'` and is only sent for `mistral-small-latest` and `mistral-medium-3-5`, matching Mistral's adjustable reasoning docs. It is omitted for other models.
 
 Reasoning example:
@@ -774,23 +843,131 @@ const mistralReasoningService = ChatServiceFactory.createChatService(
 );
 ```
 
+#### Sakana AI
+
+```typescript
+const sakanaService = ChatServiceFactory.createChatService('sakana', {
+  apiKey: process.env.FUGU_API_KEY,
+  model: 'fugu',
+});
+```
+
+Notes:
+- Sakana AI Fugu uses OpenAI-compatible Chat Completions at `https://api.sakana.ai/v1/chat/completions`.
+- Supported models: `fugu` (default), `fugu-ultra`, and `fugu-ultra-20260615`.
+- Sakana recommends `max_completion_tokens` for new Chat Completions integrations, but also accepts legacy `max_tokens`. This provider keeps `max_tokens` to match existing OpenAI-compatible provider behavior.
+- Sakana recommends the Responses API for best performance, but this provider uses Chat Completions because it matches the package's OpenAI-compatible chat path.
+- Direct browser usage may fail with CORS unless Sakana enables CORS for your origin. Use Node.js, a backend/serverless proxy, or `examples/node-basic/sakana-example.js` instead of calling Sakana directly from browser-only apps.
+
+#### PLaMo
+
+```typescript
+const plamoService = ChatServiceFactory.createChatService('plamo', {
+  apiKey: process.env.PLAMO_API_KEY,
+  model: 'plamo-3.0-prime',
+});
+```
+
+Notes:
+- PLaMo uses OpenAI-compatible Chat Completions at `https://api.platform.preferredai.jp/v1/chat/completions`.
+- Supported models: `plamo-3.0-prime` (default) and `plamo-2.2-prime`.
+- `plamo-2.2-prime` is kept for explicit compatibility, but PLaMo docs state
+  it is scheduled to be discontinued on 2026-09-30 and consolidated into
+  `plamo-3.0-prime`.
+- `reasoning_effort` can be set to `none` or `medium` for reasoning-capable PLaMo models.
+- Vision is not advertised as supported by this provider.
+- PLaMo can also be used through `openai-compatible` by manually providing the full endpoint and model.
+
 #### Gemini Nano (Chrome Built-in AI)
 
 ```typescript
 const geminiNanoService = ChatServiceFactory.createChatService('gemini-nano', {
-  responseLength: 'medium'
+  responseLength: 'short',
+  initialPrompts: [
+    {
+      role: 'system',
+      content: 'You are a cheerful character who speaks naturally.'
+    },
+    { role: 'user', content: 'How are you feeling today?' },
+    { role: 'assistant', content: 'I feel great and ready to chat!' },
+    { role: 'user', content: 'Are you ready?' },
+    { role: 'assistant', content: 'Yes, we can start anytime!' }
+  ]
 });
 ```
 
 Notes:
 - No API key required — uses Chrome's built-in LanguageModel API (Prompt API).
-- Requires **Chrome 138+** with the following flags enabled:
-  - `chrome://flags/#optimization-guide-on-device-model` → Enabled
-  - `chrome://flags/#prompt-api-for-gemini-nano` → Enabled
+- System instructions, configured examples, and the most recent conversation
+  history are passed through `initialPrompts` with their roles preserved.
+- If configured `initialPrompts` contain a system message, it is normalized to
+  the first entry. Keep few-shot examples short because they consume the
+  on-device model's context window.
+- Gemini Nano uses concrete sentence-count guidance in addition to the soft
+  token budget: `veryShort` up to 1 sentence, `short` up to 2, `medium` up to
+  3, `long` up to 5, and `veryLong` up to 10. `deep` keeps its approximately
+  5000-token guidance without a sentence-count limit. Output length is still
+  best effort.
+- Up to the most recent 20 user/assistant messages are included as structured
+  history.
+- Web pages require **Chrome 148+** on a supported desktop device. The Prompt
+  API is enabled by default, so no Chrome flags are required. Chrome extensions
+  have supported the Prompt API since Chrome 138.
 - The model runs entirely on-device; no network requests are made for inference.
 - Non-streaming only — responses are returned as a single complete text.
 - Vision is not supported.
+- See the
+  [browser-only Gemini Nano customer-support example](./examples/gemini-nano-customer-support-bot/)
+  for EN/JA language selection and frontend-only model preparation.
 - The initial model download requires a user action and may take a few minutes.
+
+##### Tip: improve response-length consistency with examples
+
+Setting `responseLength` automatically adds Gemini Nano-specific sentence-count,
+formatting, and soft token-budget instructions. You can reinforce those
+instructions by also passing two or three short user/assistant examples through
+`initialPrompts`:
+
+```typescript
+import {
+  ChatServiceFactory,
+  type GeminiNanoInitialPrompt
+} from '@aituber-onair/chat';
+
+const veryShortExamples: GeminiNanoInitialPrompt[] = [
+  { role: 'user', content: 'How are you feeling today?' },
+  { role: 'assistant', content: 'I feel great and ready to chat!' },
+  { role: 'user', content: 'What food do you like?' },
+  { role: 'assistant', content: 'Salmon sushi is my favorite!' }
+];
+
+const service = ChatServiceFactory.createChatService('gemini-nano', {
+  responseLength: 'veryShort',
+  initialPrompts: veryShortExamples
+});
+```
+
+The examples are optional; the package applies the length instruction even
+when `initialPrompts` is omitted. Examples help the on-device model learn the
+desired response size, speaking style, reaction level, and tempo more
+consistently.
+
+- Match every assistant example to the selected preset. For `veryShort`, use
+  one sentence; for `short`, use no more than two.
+- Write examples in the target character's voice. Hardcoded generic examples
+  are not added by the package because they could change the character's
+  personality.
+- Do not reuse one-sentence examples for `medium` or longer responses when you
+  want visibly longer answers; those examples can bias the model toward short
+  output.
+- Keep the set small because examples share the on-device context window with
+  the system prompt and conversation history.
+- Recreate the chat service when `responseLength` or `initialPrompts` changes.
+  The React basic example does this automatically and applies its short
+  examples only to `veryShort` and `short`.
+- These controls improve consistency but do not provide a strict output limit.
+  Chrome's LanguageModel API currently has no max-output-token option, so
+  Gemini Nano may occasionally exceed the requested sentence count.
 
 ### Vision Chat
 
@@ -854,6 +1031,21 @@ const tools: ToolDefinition[] = [{
 // Configure tool handlers when creating the service
 ```
 
+If your application executes Tools outside ChatService, use the backend helper
+to append provider-compatible assistant and Tool-result messages. It preserves
+provider-native continuation data for providers such as OpenAI and Claude.
+
+```typescript
+import { buildToolContinuationMessages } from '@aituber-onair/chat/backend';
+
+const nextMessages = buildToolContinuationMessages({
+  provider: chatService.provider,
+  messages,
+  completion,
+  toolResults,
+});
+```
+
 ### Response Length Control
 
 Base preset token targets are:
@@ -865,7 +1057,8 @@ Base preset token targets are:
 - `deep`: 5000
 
 For the OpenAI GPT-5 family (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`,
-`gpt-5.1`, `gpt-5.4`, `gpt-5.5`, `gpt-5.4-mini`, `gpt-5.4-nano`,
+`gpt-5.1`, `gpt-5.4`, `gpt-5.5`, `gpt-5.6`, `gpt-5.6-sol`,
+`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.4-mini`, `gpt-5.4-nano`,
 `gpt-5.4-pro`),
 these values are treated as base presets. The library may raise the actual
 `max_completion_tokens` or `max_output_tokens` to reduce premature truncation,
@@ -1063,21 +1256,54 @@ Semantics:
 - `unsupported`: Known to reject vision before sending the request
 - `unknown`: Cannot be pre-validated, but vision requests may still succeed
 
+### Provider Capability Discovery
+
+UI and agent runtimes can inspect provider features before creating a chat
+service:
+
+```typescript
+const capabilities = ChatServiceFactory.getProviderCapabilities(
+  'openai',
+  'gpt-5.4-mini',
+);
+
+if (capabilities?.jsonMode) {
+  // Show a JSON mode toggle or pass responseFormat safely.
+}
+
+if (!capabilities?.mcp) {
+  // Disable MCP server settings for this provider.
+}
+```
+
+`getProviderCapabilities(provider, model?)` returns machine-readable metadata
+such as `models`, `defaultModel`, `vision`, `tools`, `mcp`, `jsonMode`,
+`responseLength`, and supported `reasoningEffort` values. Use
+`getAllProviderCapabilities()` to populate provider pickers or dashboards.
+
+The capability object is static planning metadata. It does not include API keys,
+endpoints, base URLs, MCP server definitions, or other user configuration. This
+helps UI surfaces hide unsupported controls before execution, and lets agents
+choose whether to use tools, MCP, vision, JSON mode, or reasoning settings
+without hard-coding provider-specific rules.
+
 ## Available Providers
 
 Currently, the following AI providers are built-in:
 
-- **OpenAI**: Supports models like GPT-5.5, GPT-5.4 Pro, GPT-5.4, GPT-5.4 Mini, GPT-5.4 Nano, GPT-5.1, GPT-5 (Nano/Mini/Standard), GPT-4.1 (including mini and nano), GPT-4, GPT-4o-mini, O3-mini, o1, o1-mini
+- **OpenAI**: Supports models like GPT-5.6 (Sol/Terra/Luna), GPT-5.5, GPT-5.4 Pro, GPT-5.4, GPT-5.4 Mini, GPT-5.4 Nano, GPT-5.1, GPT-5 (Nano/Mini/Standard), GPT-4.1 (including mini and nano), GPT-4, GPT-4o-mini, O3-mini, o1, o1-mini
 - **OpenAI-Compatible**: Supports arbitrary local/self-hosted model IDs via OpenAI-compatible endpoints. Vision capability is treated as `unknown` unless your app knows the endpoint-specific model catalog.
-- **Gemini**: Supports recommended models like Gemini 3.5 Flash, Gemini 3.1 Flash-Lite, Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemma 4 31B IT, and Gemma 4 26B A4B IT. Gemini 3.5 Flash automatically uses minimal thinking for chat-style responses. Deprecated lifecycle models such as Gemini 3.1 Flash-Lite Preview, Gemini 3 Pro Preview, and Gemini 2.5 Flash Lite Preview remain exported for explicit use.
-- **Claude**: Supports current Claude API model IDs including Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 4.6, Claude Sonnet 4.5, Claude Haiku 4.5, plus deprecated-but-still-available Claude 4 Opus, Claude 4 Sonnet, and Claude 3 Haiku
-- **OpenRouter**: Supports a curated OpenRouter model list (OpenAI/Claude/Gemini/Z.ai/Kimi). See the OpenRouter section for model IDs.
-- **Z.ai**: Supports GLM-5/GLM-5-Turbo (text), GLM-4.7/4.6 (text), and GLM-4.6V family (vision)
-- **xAI**: Supports Grok 4.3, Grok 4.20 Reasoning/Non-Reasoning, and Grok 4-1 Fast Reasoning/Non-Reasoning, all with vision support
-- **Kimi**: Supports Kimi K2.6 (`kimi-k2.6`) and Kimi K2.5 (`kimi-k2.5`) with vision support
-- **DeepSeek**: Supports DeepSeek V4 Flash (`deepseek-v4-flash`) and DeepSeek V4 Pro (`deepseek-v4-pro`) via OpenAI-compatible Chat Completions. Legacy aliases `deepseek-chat` and `deepseek-reasoner` are deprecated by DeepSeek.
-- **Mistral**: Supports current Mistral generalist models including `mistral-small-latest`, `mistral-medium-3-5`, `mistral-large-latest`, `mistral-large-2512`, `mistral-small-2603`, and `mistral-medium-2508`, with streaming and vision support. Adjustable `reasoning_effort` is only sent for supported models.
-- **Gemini Nano**: Chrome built-in AI (LanguageModel API). Runs on-device with no API key required. Chrome 138+ with Prompt API flags enabled. Non-streaming, no vision support.
+- **Gemini**: Supports recommended models like Gemini 3.6 Flash, Gemini 3.5 Flash, Gemini 3.5 Flash-Lite, Gemini 3.1 Flash-Lite, Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemma 4 31B IT, and Gemma 4 26B A4B IT. Gemini 3 Flash models default to minimal thinking for chat-style responses, while Gemini 3 Pro models default to low. Deprecated lifecycle models such as Gemini 3.1 Flash-Lite Preview, Gemini 3 Pro Preview, and Gemini 2.5 Flash Lite Preview remain exported for explicit use.
+- **Claude**: Supports current Claude API model IDs including Claude Opus 5, Claude Sonnet 5, Claude Opus 4.8, Claude Opus 4.7, Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 4.6, Claude Sonnet 4.5, Claude Haiku 4.5, plus deprecated-but-still-available Claude 4 Opus, Claude 4 Sonnet, and Claude 3 Haiku. Adjustable `reasoning_effort` is sent as `output_config.effort` only for models that support it
+- **OpenRouter**: Supports a curated OpenRouter model list (OpenAI/Claude/Gemini/Z.ai/xAI/Kimi/DeepSeek/Kwaipilot). See the OpenRouter section for model IDs.
+- **Z.ai**: Supports GLM-5.2/GLM-5.1/GLM-5/GLM-5-Turbo (text), GLM-4.7/4.6 (text), and GLM-5V-Turbo/GLM-4.6V family (vision)
+- **xAI**: Supports Grok 4.5 with `reasoning_effort: 'low'` by default for chat-style responses, plus Grok 4.3, Grok 4.20 Reasoning/Non-Reasoning, and Grok 4-1 Fast Reasoning/Non-Reasoning, all with vision support.
+- **Kimi**: Supports Kimi K3 (`kimi-k3`, `low` / `high` / `max` reasoning with `max` as the default), Kimi K2.7 Code (`kimi-k2.7-code`), Kimi K2.7 Code HighSpeed (`kimi-k2.7-code-highspeed`), Kimi K2.6 (`kimi-k2.6`, default), and Kimi K2.5 (`kimi-k2.5`) with vision support
+- **DeepSeek**: Supports DeepSeek V4 Flash (`deepseek-v4-flash`) and DeepSeek V4 Pro (`deepseek-v4-pro`) via OpenAI-compatible Chat Completions. Thinking defaults to disabled for low-latency chat and can be enabled with model-aware `reasoning_effort`. Legacy aliases `deepseek-chat` and `deepseek-reasoner` are deprecated by DeepSeek.
+- **Mistral**: Supports the Ministral 3 family (`ministral-3b-2512`, `ministral-8b-2512`, `ministral-14b-2512`) and current Mistral generalist models, with streaming and vision support. Adjustable `reasoning_effort` is only sent for supported models.
+- **Sakana AI**: Supports Fugu (`fugu`) and Fugu Ultra (`fugu-ultra`, `fugu-ultra-20260615`) via OpenAI-compatible Chat Completions.
+- **PLaMo**: Supports PLaMo 3.0 Prime (`plamo-3.0-prime`, default) and PLaMo 2.2 Prime (`plamo-2.2-prime`) via OpenAI-compatible Chat Completions.
+- **Gemini Nano**: Chrome built-in AI (LanguageModel API). Runs on-device with no API key required. Web pages require Chrome 148+ on a supported desktop device; no Chrome flags are required. Non-streaming, no vision support.
 
 ## License
 

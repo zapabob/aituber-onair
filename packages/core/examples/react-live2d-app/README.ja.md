@@ -1,5 +1,9 @@
 # Live2D Chat
 
+Web Speech API TTS ではブラウザ音声の選択と rate、pitch、volume、language
+を設定できます。ブラウザが直接再生して音声バッファを取得できないため、
+このエンジン選択時はリップシンク非対応です。
+
 `@aituber-onair/core` を使った React 製のサンプルです。`models/`
 フォルダ配下の Live2D モデルを読み込み、`@aituber-onair/core` が
 生成した音声を再生して口パクを動かします。
@@ -7,23 +11,43 @@
 ## このサンプルでできること
 
 - LLM / TTS の設定 UI を内蔵
-- LLM プロバイダは既存の OpenAI / Gemini / Claude / Z.ai / Kimi / xAI / OpenRouter / Gemini Nano / OpenAI-compatible に加えて `deepseek` と `mistral` に対応
+- LLM プロバイダは既存の OpenAI / Gemini / Claude / Z.ai / Kimi / xAI / OpenRouter / Gemini Nano / OpenAI-compatible に加えて `deepseek`, `mistral`, disabled 表示の `sakana`, `plamo` に対応
+- xAI Grok 4.5 の `reasoning_effort` は `low`、Grok 4.3 は低レイテンシ向けに `none` がデフォルトです
 - `models/` フォルダ配下の Live2D モデルを読み込み
 - モデル一覧は `@aituber-onair/core` の対応モデルから動的取得するため、
-  Gemini 3.5 Flash や GPT-5.5 など chat 由来の新規モデルも Settings に
+  Gemini 3.6 Flash、Kimi K3、Ministral 3、GLM-5V-Turbo、GPT-5.6 など
+  chat 由来の新規モデルも Settings に
   自動反映されます
-- Gemini 3.5 Flash はチャット用途向けに minimal thinking を自動適用します
+- Gemini 3 Flash 系はチャット用途向けに minimal thinking、Gemini 3 Pro
+  は low をデフォルトで適用します
 - `gpt-5.5-pro` は OpenAI のドキュメント上でストリーミング非対応のため、
   ストリーミング前提の通常チャットフローを使うこの例では含めていません
 - モデルファイルはメモリ内だけで扱い、アプリ固有の永続保存をしない
 - アバターステージ上でドラッグ移動、ホイールズーム
+- Settings → Visual からグリーンバック背景と、アバター発話字幕だけを出す
+  ソロ配信表示を選択可能
 - `@aituber-onair/core` が生成した音声を使った口パク
 - TTS エンジンは `unrealSpeech`, `elevenLabs`, `inworld` を含む cloud provider とローカル/ブラウザ内エンジンに対応し、Inworld は API キー入力後に `/voices/v1/voices` から音声一覧を取得します
 - YouTube Live / Twitch のライブチャットを取得し、`@aituber-onair/comment-intelligence` で分析して、選ばれたコメントだけを LLM パイプラインに流す
   - YouTube は YouTube Data API v3 を利用（Google Cloud の API キーが必要）
   - Twitch は EventSub WebSocket とブラウザ上での implicit OAuth フローを利用
+- **Settings → Screen Vision** から OBS Virtual Camera の1フレームを取得し、
+  Vision 対応モデルに送ってアバターがコメント
 - `@aituber-onair/manneri` で会話の繰り返し傾向を検出し、次の応答前に
   内部的な話題転換指示を追加
+
+## Screen Vision
+
+OBS Virtual Camera を開始し、**Settings → Screen Vision** で選択してから
+**画面を見る** を押すと、現在のフレームを Vision 対応モデルに送信します。
+30秒、1分、2分、5分ごとの自動送信も選択できます。
+
+## 配信用表示
+
+**Settings → Visual** から背景をグリーンバックに切り替え、表示モードを
+ソロ配信にできます。ソロ配信では通常のチャットログを隠し、アバターの
+最新発話だけを下部字幕として表示します。ユーザー入力欄は初期状態では
+非表示ですが、同じ Visual 設定から表示できます。
 
 ## Live2D アセットの置き場所
 
@@ -83,6 +107,9 @@ npm run dev
 1. LLM / TTS の設定値
 2. `models/` フォルダに置いたモデルがあれば一覧から選んで
    `読み込む` を押す
+
+LLM セクションではシステムプロンプトも編集できます。入力欄からフォーカスが
+外れた時に反映され、ほかの設定と一緒に保存されます。
 
 ## ライブコメント取得（YouTube Live / Twitch）
 

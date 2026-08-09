@@ -3,15 +3,37 @@ import {
   ChatServiceFactory,
   ChatService,
   allowsReasoningLow,
+  allowsReasoningMax,
   allowsReasoningMinimal,
   allowsReasoningNone,
   allowsReasoningXHigh,
+  getDefaultClaudeReasoningEffort,
+  getDefaultGeminiReasoningEffort,
+  getDefaultKimiReasoningEffort,
+  getDefaultDeepSeekReasoningEffort,
   getDefaultReasoningEffortForGPT5Model,
+  isClaudeReasoningEffortModel,
   isGPT5Model,
+  isGeminiReasoningEffortModel,
+  isKimiReasoningEffortModel,
+  isDeepSeekReasoningEffortModel,
+  isXaiReasoningEffortModel,
+  normalizeGeminiReasoningEffort,
+  normalizeClaudeReasoningEffort,
+  normalizeXaiReasoningEffort,
+  normalizeDeepSeekReasoningEffort,
+  normalizeOpenRouterReasoningEffort,
   type Message,
   type MessageWithVision,
   type ChatResponseLength,
   type GPT5PresetKey,
+  type ClaudeReasoningEffort,
+  type GeminiReasoningEffort,
+  type GeminiNanoInitialPrompt,
+  type KimiReasoningEffort,
+  type DeepSeekReasoningEffort,
+  type OpenRouterReasoningEffort,
+  type ChatCompletionAssistantMessage,
 } from '@aituber-onair/chat';
 import './App.css';
 import ChatInterface from './components/ChatInterface';
@@ -34,13 +56,16 @@ export type Provider =
   | 'xai'
   | 'kimi'
   | 'deepseek'
-  | 'mistral';
+  | 'mistral'
+  | 'sakana'
+  | 'plamo';
 
 interface ChatMessage extends Omit<Message, 'timestamp' | 'content'> {
   id: string;
   timestamp: Date;
   content: Message['content'] | MessageWithVision['content'];
   isStreaming?: boolean;
+  assistantMessage?: ChatCompletionAssistantMessage;
 }
 
 type ReasoningEffortLevel =
@@ -49,11 +74,19 @@ type ReasoningEffortLevel =
   | 'low'
   | 'medium'
   | 'high'
-  | 'xhigh';
+  | 'xhigh'
+  | 'max';
+type XaiReasoningEffortLevel = 'none' | 'low' | 'medium' | 'high';
 
 const KIMI_OFFICIAL_BASE_URL = 'https://api.moonshot.ai/v1';
 const DEFAULT_OPENAI_COMPAT_ENDPOINT =
   'http://127.0.0.1:18080/v1/chat/completions';
+const GEMINI_NANO_SHORT_INITIAL_PROMPTS: GeminiNanoInitialPrompt[] = [
+  { role: 'user', content: '一言で挨拶して' },
+  { role: 'assistant', content: 'こんにちは、今日もよろしくね！' },
+  { role: 'user', content: '準備できた？' },
+  { role: 'assistant', content: 'うん、いつでも始められるよ！' },
+];
 
 const normalizeReasoningEffortForModel = (
   modelId?: string,
@@ -93,6 +126,10 @@ const normalizeReasoningEffortForModel = (
     return 'high';
   }
 
+  if (effort === 'max' && !allowsReasoningMax(modelId)) {
+    return allowsReasoningXHigh(modelId) ? 'xhigh' : 'high';
+  }
+
   return effort;
 };
 
@@ -120,9 +157,8 @@ function App() {
     DEFAULT_OPENAI_COMPAT_ENDPOINT,
   );
   const [enableReasoningSummary, setEnableReasoningSummary] = useState(false);
-  const [openrouterReasoningEffort, setOpenrouterReasoningEffort] = useState<
-    'none' | 'minimal' | 'low' | 'medium' | 'high'
-  >('none');
+  const [openrouterReasoningEffort, setOpenrouterReasoningEffort] =
+    useState<OpenRouterReasoningEffort>('none');
   const [openrouterIncludeReasoning, setOpenrouterIncludeReasoning] =
     useState(false);
   const [openrouterReasoningMaxTokens, setOpenrouterReasoningMaxTokens] =
@@ -149,9 +185,65 @@ function App() {
     selectedModel,
     reasoning_effort,
   );
+  const requestedClaudeReasoningEffort: ClaudeReasoningEffort | undefined =
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'medium' ||
+    reasoning_effort === 'high' ||
+    reasoning_effort === 'xhigh' ||
+    reasoning_effort === 'max'
+      ? reasoning_effort
+      : undefined;
+  const claudeReasoningEffort = normalizeClaudeReasoningEffort(
+    selectedModel,
+    requestedClaudeReasoningEffort,
+  );
+  const requestedGeminiReasoningEffort: GeminiReasoningEffort | undefined =
+    reasoning_effort === 'minimal' ||
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'medium' ||
+    reasoning_effort === 'high'
+      ? reasoning_effort
+      : undefined;
+  const geminiReasoningEffort = normalizeGeminiReasoningEffort(
+    selectedModel,
+    requestedGeminiReasoningEffort,
+  );
+  const xaiReasoningEffort: XaiReasoningEffortLevel =
+    normalizeXaiReasoningEffort(
+      selectedModel,
+      reasoning_effort === 'low' ||
+        reasoning_effort === 'medium' ||
+        reasoning_effort === 'high'
+        ? reasoning_effort
+        : 'none',
+    ) ?? 'none';
+  const requestedKimiReasoningEffort: KimiReasoningEffort | undefined =
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'high' ||
+    reasoning_effort === 'max'
+      ? reasoning_effort
+      : undefined;
+  const kimiReasoningEffort =
+    requestedKimiReasoningEffort ??
+    getDefaultKimiReasoningEffort(selectedModel) ??
+    'max';
+  const requestedDeepSeekReasoningEffort: DeepSeekReasoningEffort | undefined =
+    reasoning_effort === 'none' ||
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'high' ||
+    reasoning_effort === 'max'
+      ? reasoning_effort
+      : undefined;
+  const deepSeekReasoningEffort =
+    normalizeDeepSeekReasoningEffort(
+      selectedModel,
+      requestedDeepSeekReasoningEffort,
+    ) ?? 'none';
   const visionSupportLevel = getVisionSupportLevel(provider, selectedModel);
   const effectiveApiKey =
     provider === 'openai-compatible' ? apiKey.trim() : apiKey;
+  const isGeminiNanoReady =
+    provider !== 'gemini-nano' || geminiNano.status === 'available';
 
   // Auto-scroll to bottom when messages change
   // biome-ignore lint/correctness/useExhaustiveDependencies: We intentionally want to scroll when messages change
@@ -197,6 +289,27 @@ function App() {
           options.endpoint = endpoint;
         }
 
+        if (
+          provider === 'claude' &&
+          isClaudeReasoningEffortModel(selectedModel)
+        ) {
+          options.reasoning_effort = claudeReasoningEffort;
+        }
+
+        if (
+          provider === 'gemini' &&
+          isGeminiReasoningEffortModel(selectedModel)
+        ) {
+          options.reasoning_effort = geminiReasoningEffort;
+        }
+
+        if (
+          provider === 'gemini-nano' &&
+          (responseLength === 'veryShort' || responseLength === 'short')
+        ) {
+          options.initialPrompts = GEMINI_NANO_SHORT_INITIAL_PROMPTS;
+        }
+
         if (provider === 'openrouter') {
           options.reasoning_effort = openrouterReasoningEffort;
           options.includeReasoning = openrouterIncludeReasoning;
@@ -213,6 +326,17 @@ function App() {
           if (openrouterAppUrl.trim()) {
             options.appUrl = openrouterAppUrl.trim();
           }
+        }
+
+        if (
+          provider === 'deepseek' &&
+          isDeepSeekReasoningEffortModel(selectedModel)
+        ) {
+          options.reasoning_effort = deepSeekReasoningEffort;
+        }
+
+        if (provider === 'xai' && isXaiReasoningEffortModel(selectedModel)) {
+          options.reasoning_effort = xaiReasoningEffort;
         }
 
         if (provider === 'zai') {
@@ -245,7 +369,11 @@ function App() {
         }
 
         if (provider === 'kimi') {
-          options.thinking = { type: kimiThinkingType };
+          if (isKimiReasoningEffortModel(selectedModel)) {
+            options.reasoning_effort = kimiReasoningEffort;
+          } else {
+            options.thinking = { type: kimiThinkingType };
+          }
           if (kimiBaseUrl.trim()) {
             options.baseUrl = kimiBaseUrl.trim();
           }
@@ -270,6 +398,11 @@ function App() {
     selectedModel,
     gpt5Preset,
     normalizedReasoningEffort,
+    claudeReasoningEffort,
+    geminiReasoningEffort,
+    xaiReasoningEffort,
+    kimiReasoningEffort,
+    deepSeekReasoningEffort,
     verbosity,
     gpt5EndpointPreference,
     openaiCompatibleEndpoint,
@@ -346,8 +479,14 @@ function App() {
 
       try {
         const chatMessages: (Message | MessageWithVision)[] = messages
-          .filter((m) => m.role !== 'assistant' || m.content)
-          .map(({ role, content }) => ({ role, content }));
+          .filter(
+            (m) => m.role !== 'assistant' || m.content || m.assistantMessage,
+          )
+          .map((message) =>
+            message.assistantMessage
+              ? message.assistantMessage
+              : { role: message.role, content: message.content },
+          );
 
         chatMessages.push(apiMessage);
 
@@ -367,11 +506,16 @@ function App() {
               ),
             );
           },
-          async (complete) => {
+          async (complete, completion) => {
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMessage.id
-                  ? { ...msg, content: complete, isStreaming: false }
+                  ? {
+                      ...msg,
+                      content: complete,
+                      isStreaming: false,
+                      assistantMessage: completion?.assistant_message,
+                    }
                   : msg,
               ),
             );
@@ -398,10 +542,11 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="brand">
-          <div className="brand-title">AITuber OnAir Chat</div>
-          <div className="brand-subtitle">
+          <span className="brand-eyebrow">@aituber-onair/chat</span>
+          <h1 className="brand-title">AITuber OnAir Chat</h1>
+          <p className="brand-subtitle">
             Sample UI for provider + model selection
-          </div>
+          </p>
         </div>
       </header>
 
@@ -425,6 +570,30 @@ function App() {
                     ? getDefaultReasoningEffortForGPT5Model(defaultModel)
                     : 'medium',
                 );
+              } else if (newProvider === 'claude') {
+                setReasoningEffort(
+                  getDefaultClaudeReasoningEffort(defaultModel) ?? 'high',
+                );
+              } else if (newProvider === 'gemini') {
+                setReasoningEffort(
+                  getDefaultGeminiReasoningEffort(defaultModel) ?? 'minimal',
+                );
+              } else if (
+                newProvider === 'kimi' &&
+                isKimiReasoningEffortModel(defaultModel)
+              ) {
+                setReasoningEffort(
+                  getDefaultKimiReasoningEffort(defaultModel) ?? 'max',
+                );
+              } else if (
+                newProvider === 'xai' &&
+                isXaiReasoningEffortModel(defaultModel)
+              ) {
+                setReasoningEffort('none');
+              } else if (newProvider === 'deepseek') {
+                setReasoningEffort(
+                  getDefaultDeepSeekReasoningEffort(defaultModel) ?? 'none',
+                );
               } else {
                 setReasoningEffort('medium');
               }
@@ -447,11 +616,74 @@ function App() {
                     ? getDefaultReasoningEffortForGPT5Model(modelId)
                     : 'medium',
                 );
+              } else if (newProvider === 'claude') {
+                const requestedEffort =
+                  reasoning_effort === 'low' ||
+                  reasoning_effort === 'medium' ||
+                  reasoning_effort === 'high' ||
+                  reasoning_effort === 'xhigh' ||
+                  reasoning_effort === 'max'
+                    ? reasoning_effort
+                    : undefined;
+                setReasoningEffort(
+                  normalizeClaudeReasoningEffort(modelId, requestedEffort) ??
+                    'high',
+                );
+              } else if (newProvider === 'gemini') {
+                const requestedEffort =
+                  reasoning_effort === 'minimal' ||
+                  reasoning_effort === 'low' ||
+                  reasoning_effort === 'medium' ||
+                  reasoning_effort === 'high'
+                    ? reasoning_effort
+                    : undefined;
+                setReasoningEffort(
+                  normalizeGeminiReasoningEffort(modelId, requestedEffort) ??
+                    'minimal',
+                );
+              } else if (
+                newProvider === 'xai' &&
+                isXaiReasoningEffortModel(modelId)
+              ) {
+                setReasoningEffort('none');
+              } else if (
+                newProvider === 'kimi' &&
+                isKimiReasoningEffortModel(modelId)
+              ) {
+                setReasoningEffort(
+                  getDefaultKimiReasoningEffort(modelId) ?? 'max',
+                );
+              } else if (newProvider === 'deepseek') {
+                setReasoningEffort(
+                  normalizeDeepSeekReasoningEffort(
+                    modelId,
+                    requestedDeepSeekReasoningEffort,
+                  ) ?? 'none',
+                );
+              } else if (newProvider === 'openrouter') {
+                setOpenrouterReasoningEffort(
+                  normalizeOpenRouterReasoningEffort(
+                    modelId,
+                    openrouterReasoningEffort,
+                  ) ?? 'none',
+                );
               }
             }}
             gpt5Preset={gpt5Preset}
             onGpt5PresetChange={setGpt5Preset}
-            reasoning_effort={normalizedReasoningEffort}
+            reasoning_effort={
+              provider === 'xai'
+                ? xaiReasoningEffort
+                : provider === 'claude'
+                  ? (claudeReasoningEffort ?? 'high')
+                  : provider === 'gemini'
+                    ? (geminiReasoningEffort ?? 'minimal')
+                    : provider === 'kimi'
+                      ? kimiReasoningEffort
+                      : provider === 'deepseek'
+                        ? deepSeekReasoningEffort
+                        : normalizedReasoningEffort
+            }
             onReasoningEffortChange={setReasoningEffort}
             verbosity={verbosity}
             onVerbosityChange={setVerbosity}
@@ -501,7 +733,12 @@ function App() {
 
           <ChatInterface
             onSendMessage={sendMessage}
-            disabled={!chatService || isLoading}
+            disabled={!chatService || isLoading || !isGeminiNanoReady}
+            disabledPlaceholder={
+              provider === 'gemini-nano' && !isGeminiNanoReady
+                ? 'Preparing Gemini Nano...'
+                : undefined
+            }
             isLoading={isLoading}
             onClearChat={clearChat}
             visionSupportLevel={visionSupportLevel}

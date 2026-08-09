@@ -1,5 +1,5 @@
-import type { CommentAnalysisLLMProvider } from './llm';
-import type { RankingStrategy, RankingWeights } from './ranking';
+import type { CommentAnalysisLLMProvider } from './llm.js';
+import type { RankingStrategy, RankingWeights } from './ranking.js';
 
 export type CommentAnalysisMode = 'rules' | 'hybrid' | 'llm-assisted';
 
@@ -23,8 +23,15 @@ export type CommentIntelligenceConfig = {
   };
   ranking?: {
     strategy?: RankingStrategy;
+    topicFilter?: 'off' | 'prefer' | 'require';
     maxSelectedComments?: number;
     minScore?: number;
+    answeredMemory?: {
+      enabled?: boolean;
+      ttlMs?: number;
+      mode?: 'deprioritize' | 'exclude';
+      dedupeByViewer?: boolean;
+    };
     weights?: Partial<RankingWeights>;
   };
   summary?: {

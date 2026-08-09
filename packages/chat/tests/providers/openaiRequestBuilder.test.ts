@@ -6,7 +6,11 @@ import {
   MODEL_GPT_5_4,
   MODEL_GPT_5_4_MINI,
   MODEL_GPT_5_4_NANO,
+  MODEL_GPT_5_6,
+  MODEL_GPT_5_6_TERRA,
+  MODEL_GPT_5_NANO,
 } from '../../src/constants';
+import { buildToolContinuationMessages } from '../../src/backend';
 import { buildOpenAIRequestBody } from '../../src/services/providers/openai/openaiRequestBuilder';
 import type {
   MCPServerConfig,
@@ -17,6 +21,113 @@ import type {
 const messages: Message[] = [{ role: 'user', content: 'hello' }];
 
 describe('buildOpenAIRequestBody', () => {
+  it('preserves Responses API Tool and reasoning items across a host Tool loop', () => {
+    const providerContent = [
+      {
+        type: 'reasoning',
+        id: 'reasoning-1',
+        encrypted_content: 'opaque-state',
+      },
+      {
+        type: 'function_call',
+        id: 'item-1',
+        call_id: 'call-1',
+        name: 'get_weather',
+        arguments: '{"city":"Tokyo"}',
+      },
+    ];
+    const continued = buildToolContinuationMessages({
+      provider: 'openai',
+      messages: [{ role: 'user', content: 'Weather in Tokyo?' }],
+      completion: {
+        blocks: [
+          {
+            type: 'tool_use',
+            id: 'call-1',
+            name: 'get_weather',
+            input: { city: 'Tokyo' },
+          },
+        ],
+        assistant_message: {
+          role: 'assistant',
+          content: '',
+          provider_content: providerContent,
+        },
+      },
+      toolResults: [
+        {
+          type: 'tool_result',
+          tool_use_id: 'call-1',
+          content: '{"temperature":25}',
+        },
+      ],
+    });
+
+    const body = buildOpenAIRequestBody({
+      provider: 'openai',
+      endpoint: ENDPOINT_OPENAI_RESPONSES_API,
+      messages: continued,
+      model: MODEL_GPT_5_4,
+      stream: false,
+      tools: [],
+      mcpServers: [],
+    });
+
+    expect(body.input).toEqual([
+      { role: 'user', content: 'Weather in Tokyo?' },
+      ...providerContent,
+      {
+        type: 'function_call_output',
+        call_id: 'call-1',
+        output: '{"temperature":25}',
+      },
+    ]);
+  });
+
+  it('builds a GPT-5.6 Chat Completions request with max reasoning', () => {
+    const body = buildOpenAIRequestBody({
+      provider: 'openai',
+      endpoint: ENDPOINT_OPENAI_CHAT_COMPLETIONS_API,
+      messages,
+      model: MODEL_GPT_5_6,
+      stream: true,
+      tools: [],
+      mcpServers: [],
+      responseLength: CHAT_RESPONSE_LENGTH.MEDIUM,
+      reasoning_effort: 'max',
+    });
+
+    expect(body).toEqual({
+      model: MODEL_GPT_5_6,
+      stream: true,
+      max_completion_tokens: 25000,
+      messages,
+      reasoning_effort: 'max',
+    });
+  });
+
+  it('builds a GPT-5.6 Terra Responses request with max reasoning', () => {
+    const body = buildOpenAIRequestBody({
+      provider: 'openai',
+      endpoint: ENDPOINT_OPENAI_RESPONSES_API,
+      messages,
+      model: MODEL_GPT_5_6_TERRA,
+      stream: true,
+      tools: [],
+      mcpServers: [],
+      responseLength: CHAT_RESPONSE_LENGTH.MEDIUM,
+      reasoning_effort: 'max',
+    });
+
+    expect(body).toEqual({
+      model: MODEL_GPT_5_6_TERRA,
+      stream: true,
+      max_output_tokens: 25000,
+      input: messages,
+      reasoning: { effort: 'max' },
+    });
+  });
+
   it('raises chat completions token limit for GPT-5.4 responseLength presets', () => {
     const body = buildOpenAIRequestBody({
       provider: 'openai',
@@ -67,6 +178,21 @@ describe('buildOpenAIRequestBody', () => {
     expect(body.max_output_tokens).toBe(2000);
   });
 
+  it('uses the minimal reasoning minimum for GPT-5-nano when effort is unspecified', () => {
+    const body = buildOpenAIRequestBody({
+      provider: 'openai',
+      endpoint: ENDPOINT_OPENAI_RESPONSES_API,
+      messages,
+      model: MODEL_GPT_5_NANO,
+      stream: false,
+      tools: [],
+      mcpServers: [],
+      responseLength: CHAT_RESPONSE_LENGTH.VERY_SHORT,
+    });
+
+    expect(body.max_output_tokens).toBe(1600);
+  });
+
   it('keeps explicit maxTokens unchanged', () => {
     const body = buildOpenAIRequestBody({
       provider: 'openai',
@@ -84,7 +210,7 @@ describe('buildOpenAIRequestBody', () => {
     expect(body.max_output_tokens).toBe(300);
   });
 
-  it('converts responses vision blocks and maps tool role to user', () => {
+  it('converts responses vision blocks and preserves legacy Tool fallback', () => {
     const visionMessages: MessageWithVision[] = [
       {
         role: 'user',
@@ -128,6 +254,66 @@ describe('buildOpenAIRequestBody', () => {
         content: 'tool result',
       },
     ]);
+  });
+
+  it('adds response_format for chat completions JSON mode', () => {
+    const body = buildOpenAIRequestBody({
+      provider: 'openai',
+      endpoint: ENDPOINT_OPENAI_CHAT_COMPLETIONS_API,
+      messages,
+      model: MODEL_GPT_5_4_MINI,
+      stream: false,
+      tools: [],
+      mcpServers: [],
+      responseFormat: { type: 'json_object' },
+    });
+
+    expect(body.response_format).toEqual({ type: 'json_object' });
+  });
+
+  it('maps responseFormat into responses text.format', () => {
+    const body = buildOpenAIRequestBody({
+      provider: 'openai',
+      endpoint: ENDPOINT_OPENAI_RESPONSES_API,
+      messages,
+      model: MODEL_GPT_5_4_MINI,
+      stream: false,
+      tools: [],
+      mcpServers: [],
+      verbosity: 'low',
+      responseFormat: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'sample',
+          schema: {
+            type: 'object',
+            properties: {
+              answer: { type: 'string' },
+            },
+            required: ['answer'],
+            additionalProperties: false,
+          },
+          strict: true,
+        },
+      },
+    });
+
+    expect(body.text).toEqual({
+      verbosity: 'low',
+      format: {
+        type: 'json_schema',
+        name: 'sample',
+        schema: {
+          type: 'object',
+          properties: {
+            answer: { type: 'string' },
+          },
+          required: ['answer'],
+          additionalProperties: false,
+        },
+        strict: true,
+      },
+    });
   });
 
   it('normalizes Mistral image_url blocks to string URLs', () => {

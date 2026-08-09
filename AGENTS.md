@@ -30,6 +30,8 @@
 - TypeScript + Biome (2‑space indent, single quotes, 80‑char width). Code/comments in English.
 - Use barrel exports (`index.ts`) to define public API; minimize external deps.
 - Tests live in `tests` with `*.test.ts` naming.
+- Docs: when naming a specific model/provider as an exception, state the
+  general rule first (which group and why), then the current instances.
 
 ## Testing Guidelines
 - Framework: Vitest (jsdom where browser APIs are needed).
@@ -83,34 +85,47 @@
 
 ## Agent Skills Usage
 - Use the shared skill guide in `docs/agent-skills.md`.
+- For any LLM/TTS model or provider addition/update, first read
+  `docs/agent-model-provider-guidelines.md`. Do not add a model/provider to
+  supported lists unless the exact endpoint family, request shape, response
+  shape, capabilities, and user configuration path are documented or
+  live-verified.
 - Skills:
   - `add-chat-model`
   - `add-tts-provider`
   - `sync-core-after-chat-upgrade`
   - `wrap-tts-as-openai-compatible`
   - `connect-colab-local-tts`
+  - `connect-colab-local-llm`
+  - `create-pngtuber-avatar-states`
 - Canonical skill sources:
   - `skills/add-chat-model/SKILL.md`
   - `skills/add-tts-provider/SKILL.md`
   - `skills/sync-core-after-chat-upgrade/SKILL.md`
   - `skills/wrap-tts-as-openai-compatible/SKILL.md`
   - `skills/connect-colab-local-tts/SKILL.md`
+  - `skills/connect-colab-local-llm/SKILL.md`
+  - `skills/create-pngtuber-avatar-states/SKILL.md`
 - Claude Code mirror paths:
   - `.claude/skills/add-chat-model/SKILL.md`
   - `.claude/skills/add-tts-provider/SKILL.md`
   - `.claude/skills/sync-core-after-chat-upgrade/SKILL.md`
   - `.claude/skills/wrap-tts-as-openai-compatible/SKILL.md`
   - `.claude/skills/connect-colab-local-tts/SKILL.md`
-- When requests match "add a new model", "support model <model_id>", "add <provider> model", or "update supported models", follow `skills/add-chat-model/SKILL.md`.
-- When requests match "add a TTS provider", "support <provider> TTS", "add voice provider", or "update supported voice providers", follow `skills/add-tts-provider/SKILL.md`.
+  - `.claude/skills/connect-colab-local-llm/SKILL.md`
+  - `.claude/skills/create-pngtuber-avatar-states/SKILL.md`
+- When requests match "add a new model", "support model <model_id>", "add <provider> model", or "update supported models", follow `skills/add-chat-model/SKILL.md` and the hard gates in `docs/agent-model-provider-guidelines.md`.
+- When requests match "add a TTS provider", "support <provider> TTS", "add voice provider", or "update supported voice providers", follow `skills/add-tts-provider/SKILL.md` and the hard gates in `docs/agent-model-provider-guidelines.md`.
 - When requests ask to apply chat upgrades to core/examples, follow `skills/sync-core-after-chat-upgrade/SKILL.md`.
 - When propagating `@aituber-onair/voice` upgrades into `@aituber-onair/core`,
   do not stop at core exports or the React basic example. Check and update all
   core React examples that expose TTS settings:
   `packages/core/examples/react-basic`,
   `packages/core/examples/react-pngtuber-app`,
-  `packages/core/examples/react-vrm-app`, and
-  `packages/core/examples/react-live2d-app`. For each provider, verify the
+  `packages/core/examples/react-pet-app`,
+  `packages/core/examples/react-vrm-app`,
+  `packages/core/examples/react-live2d-app`, and
+  `packages/core/examples/react-purupuru-app`. For each provider, verify the
   engine selector, persisted settings type/defaults, settings UI,
   `VoiceServiceOptions` wiring, README mention, lockfile metadata, and example
   build. Cloud voice providers that expose voice-list APIs should provide a
@@ -119,7 +134,22 @@
 - For `wrap-tts-as-openai-compatible`, first classify the upstream TTS as direct Python API, CLI/file-output, or internal runtime plus save helper, then validate the wrapper from `@aituber-onair/voice` when applicable.
 - Prefer this skill for practical local TTS engines that cleanly support one-shot WAV generation. Do not force research-first or streaming-first systems into this workflow.
 - When requests match "connect Colab local TTS", "launch local-tts-on-google-colab", "use Colab MCP Go for TTS", or "try a Colab OpenAI-compatible TTS URL from `@aituber-onair/voice`", follow `skills/connect-colab-local-tts/SKILL.md`.
-- If required inputs are missing, collect: `provider`, `model_id`, `model_const_name`, `display_name`, `supports_vision`, and optional `bump_version` (default `true`).
-- For `add-tts-provider`, collect missing inputs: `engine_type`, `engine_class_name`, `display_name`, `provider_kind`, `default_speaker`, `requires_api_key`, `supports_emotion`, and `option_fields`, plus optional `default_api_url`, `examples_scope`, and `bump_version` (default `true`).
+- When requests match "connect Colab local LLM", "launch vLLM on Colab",
+  "serve GGUF with llama.cpp on Colab", "use Colab MCP Go for a local LLM", or
+  "validate a Colab OpenAI-compatible chat endpoint from a Core sample", follow
+  `skills/connect-colab-local-llm/SKILL.md`.
+- For `connect-colab-local-llm`, collect `backend` (default `vllm`; infer
+  `llama.cpp` for GGUF), required `model_id`, and optional
+  `served_model_name`, `model_revision`, `vllm_version`, `cuda_variant`,
+  `llama_cpp_revision`, `gguf_filename`, `cloudflared_version`,
+  `core_example`, `test_prompt`, `exposure`, and backend runtime settings. A
+  loopback-only diagnostic may omit API authentication. Before opening a
+  cloudflared Quick Tunnel, generate a random per-session API key automatically
+  so the user only needs to paste the endpoint, model, and key into Core. Quick
+  Tunnel streaming must pass the live compatibility probe in every session; do
+  not fall back to ngrok.
+- When requests ask to create PNGTuber avatar state images, generate mouth/eye open-close variants, split a 2x2 avatar sheet, remove avatar backgrounds, or align avatar state images, follow `skills/create-pngtuber-avatar-states/SKILL.md`.
+- If required inputs are missing, collect: `provider`, `model_id`, `model_const_name`, `display_name`, `supports_vision`, and optional `bump_version` (default `false`; set `true` only when release/version work is explicitly requested).
+- For `add-tts-provider`, collect missing inputs: `engine_type`, `engine_class_name`, `display_name`, `provider_kind`, `default_speaker`, `requires_api_key`, `supports_emotion`, and `option_fields`, plus optional `default_api_url`, `examples_scope`, and `bump_version` (default `false`; set `true` only when release/version work is explicitly requested).
 - After finishing `add-chat-model`, ask whether to run `sync-core-after-chat-upgrade` unless the user already asked for end-to-end chat+core propagation.
 - Keep skill copies synchronized when updating procedures.

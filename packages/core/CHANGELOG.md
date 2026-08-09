@@ -1,5 +1,130 @@
 # @aituber-onair/core
 
+## 0.26.10
+
+### Patch Changes
+
+- Synced Chat updates through `@aituber-onair/chat@0.50.0` into Core:
+  - re-exported DeepSeek and OpenRouter reasoning-effort types, defaults,
+    normalization helpers, and the OpenRouter DeepSeek V4 Flash model constants
+  - added the fixed DeepSeek V4 Flash 0731 and preview OpenRouter model IDs to
+    the React basic example
+  - added model-aware DeepSeek and OpenRouter reasoning controls that default
+    to `none` for responsive chat
+  - refreshed every Core example lockfile so all examples use the Chat 0.50.0
+    provider behavior
+- Updated dependencies []:
+  - @aituber-onair/chat@0.50.0
+
+## 0.26.9
+
+### Patch Changes
+
+- Synced Chat updates through `@aituber-onair/chat@0.49.0` into Core:
+  - re-exported Claude Opus 5, Claude reasoning-effort helpers, Gemini Nano
+    initial-prompt types, and the expanded curated OpenRouter model constants
+  - added model-aware Claude reasoning controls to the React basic example
+    while keeping Claude Haiku 4.5 as the default
+  - refreshed the React basic Claude and OpenRouter model lists and documented
+    Auto Router token-limit behavior and model availability constraints
+  - refreshed every Core example lockfile so React examples that source model
+    lists from Core receive the Chat 0.49.0 models automatically
+- Updated dependencies []:
+  - @aituber-onair/chat@0.49.0
+
+## 0.26.8
+
+### Patch Changes
+
+- Synced LLM updates through `@aituber-onair/chat@0.48.0` into Core:
+  - re-exported Gemini 3.6 Flash, Gemini 3.5 Flash-Lite, Ministral 3,
+    GLM-5.1, GLM-5V-Turbo, and Gemini reasoning-effort helpers
+  - added Gemini 3 model-aware reasoning controls and Kimi K3's required
+    `reasoning_effort: 'max'` behavior to the React basic example
+  - refreshed Core example model lists and documentation for the new Gemini,
+    Kimi, Mistral, and Z.ai models
+- Updated dependencies []:
+  - @aituber-onair/chat@0.48.0
+
+## 0.26.7
+
+### Patch Changes
+
+- Synced Chat updates through `@aituber-onair/chat@0.46.0` into Core:
+  - re-exported Grok 4.5, GPT-5.6 family constants, and the related reasoning
+    capability helpers
+  - updated React examples for Grok 4.5's `low` reasoning default and GPT-5.6
+    model selection
+- Synced Web Speech support from `@aituber-onair/voice@0.19.0` into Core:
+  - re-exported the Web Speech engine, option types, and voice-list helpers
+  - added browser voice selection and rate, pitch, volume, and language
+    settings to all Core React examples
+  - documented that Web Speech plays directly through the browser and does not
+    support the examples' audio-buffer-based lip sync
+- Updated dependencies []:
+  - @aituber-onair/chat@0.46.0
+  - @aituber-onair/voice@0.19.0
+
+## 0.26.6
+
+### Patch Changes
+
+- Synced package upgrade surfaces from `@aituber-onair/chat@0.44.0` and
+  `@aituber-onair/voice@0.18.0` into core:
+  - re-exported chat provider capability metadata, OpenRouter provider classes,
+    Claude Sonnet 5, and related provider option types
+  - added `AITuberOnAirCore` static helpers for provider capability and vision
+    support discovery
+  - re-exported voice engine capability and voice-list helpers from core
+  - refreshed Core example lockfile metadata for the updated voice, manneri,
+    and comment-intelligence package versions
+- Updated dependencies []:
+  - @aituber-onair/chat@0.44.0
+  - @aituber-onair/voice@0.18.0
+
+## 0.26.5
+
+### Patch Changes
+
+- Synced xAI reasoning effort support from `@aituber-onair/chat@0.43.0` into
+  core:
+  - re-exported the xAI reasoning effort type and capability helpers
+  - added xAI reasoning effort controls to the Core React examples for Grok 4.3
+  - kept the default xAI reasoning effort at `none` for low-latency character
+    chat responses
+- Updated dependencies []:
+  - @aituber-onair/chat@0.43.0
+
+## 0.26.4
+
+### Patch Changes
+
+- Synced Sakana AI and PLaMo support from `@aituber-onair/chat@0.42.0` into
+  core:
+  - re-exported Sakana AI and PLaMo provider classes, options, model constants,
+    endpoints, and the PLaMo reasoning effort type
+  - added PLaMo to the Core React examples and showed Sakana AI as disabled in
+    browser UIs because direct browser requests can fail with CORS
+  - refreshed Core docs and example READMEs for the newly synced providers
+- Updated dependencies []:
+  - @aituber-onair/chat@0.42.0
+
+## 0.26.3
+
+### Patch Changes
+
+- Synced Kimi K2.7 Code and GLM-5.2 support from
+  `@aituber-onair/chat@0.40.0` into core:
+  - re-exported the new Kimi, Z.ai, and OpenRouter model constants and Kimi
+    thinking capability helpers
+  - added Kimi K2.7 Code, Kimi K2.7 Code HighSpeed, GLM-5.2, and the matching
+    OpenRouter curated IDs to the React basic example model lists
+  - documented that Kimi K2.7 Code models require thinking mode and that
+    OpenRouter GLM-5.2 avoids automatic `max_tokens` while defaulting
+    reasoning effort to `none`
+- Updated dependencies []:
+  - @aituber-onair/chat@0.40.0
+
 ## 0.26.2
 
 ### Patch Changes

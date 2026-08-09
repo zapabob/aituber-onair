@@ -4,6 +4,7 @@ import type { VisionSupportLevel } from '@aituber-onair/chat';
 interface ChatInterfaceProps {
   onSendMessage: (message: string, imageData?: string) => void;
   disabled: boolean;
+  disabledPlaceholder?: string;
   isLoading: boolean;
   onClearChat: () => void;
   visionSupportLevel: VisionSupportLevel;
@@ -12,6 +13,7 @@ interface ChatInterfaceProps {
 export default function ChatInterface({
   onSendMessage,
   disabled,
+  disabledPlaceholder,
   isLoading,
   onClearChat,
   visionSupportLevel,
@@ -84,7 +86,8 @@ export default function ChatInterface({
             onChange={(e) => setMessage(e.target.value)}
             placeholder={
               disabled
-                ? 'Enter API key above to start chatting...'
+                ? (disabledPlaceholder ??
+                  'Enter API key above to start chatting...')
                 : 'Type your message...'
             }
             disabled={disabled}
@@ -161,7 +164,7 @@ export default function ChatInterface({
           position: absolute;
           top: -10px;
           right: -10px;
-          background: #0f0f0f;
+          background: var(--brand-strong);
           color: white;
           border: none;
           border-radius: 999px;
@@ -205,7 +208,7 @@ export default function ChatInterface({
         }
         
         .chat-input:disabled {
-          background: #f1f1f1;
+          background: var(--brand-soft);
           cursor: not-allowed;
         }
         
@@ -223,7 +226,8 @@ export default function ChatInterface({
         }
         
         .image-button:hover:not(.disabled) {
-          background: #f1f1f1;
+          border-color: var(--brand);
+          background: var(--brand-tint);
           transform: translateY(-1px);
         }
         
@@ -234,9 +238,9 @@ export default function ChatInterface({
         
         .send-button {
           padding: 0.75rem 1.5rem;
-          background: #0f0f0f;
+          background: var(--brand-strong);
           color: white;
-          border: 1px solid #0f0f0f;
+          border: 1px solid var(--brand-strong);
           border-radius: 999px;
           font-weight: 600;
           cursor: pointer;
@@ -247,7 +251,8 @@ export default function ChatInterface({
         }
         
         .send-button:hover:not(:disabled) {
-          background: #1c1c1c;
+          background: var(--brand);
+          border-color: var(--brand);
           transform: translateY(-1px);
         }
         
@@ -269,7 +274,8 @@ export default function ChatInterface({
         }
         
         .clear-button:hover {
-          background: #f1f1f1;
+          border-color: var(--brand);
+          background: var(--brand-tint);
           transform: translateY(-1px);
         }
       `}</style>

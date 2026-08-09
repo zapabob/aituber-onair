@@ -6,6 +6,16 @@ import type {
   ChatServiceOptions,
   VisionSupportLevel,
 } from '../src/services/providers/ChatServiceProvider';
+import {
+  MODEL_CLAUDE_4_5_HAIKU,
+  MODEL_CLAUDE_5_OPUS,
+  MODEL_KIMI_K3,
+  MODEL_KIMI_K2_6,
+  MODEL_DEEPSEEK_V4_FLASH,
+  MODEL_DEEPSEEK_V4_PRO,
+  MODEL_OPENROUTER_DEEPSEEK_V4_FLASH,
+  MODEL_OPENROUTER_DEEPSEEK_V4_FLASH_0731,
+} from '../src/constants';
 
 // Mock provider for testing
 class MockChatServiceProvider implements ChatServiceProvider {
@@ -168,6 +178,18 @@ describe('ChatServiceFactory', () => {
         apiKey: 'test-mistral-key',
       });
       expect(mistralService).toBeDefined();
+
+      // Test Sakana
+      const sakanaService = ChatServiceFactory.createChatService('sakana', {
+        apiKey: 'test-sakana-key',
+      });
+      expect(sakanaService).toBeDefined();
+
+      // Test PLaMo
+      const plamoService = ChatServiceFactory.createChatService('plamo', {
+        apiKey: 'test-plamo-key',
+      });
+      expect(plamoService).toBeDefined();
     });
 
     it('should accept provider-specific options', () => {
@@ -199,6 +221,8 @@ describe('ChatServiceFactory', () => {
       expect(providers.has('kimi')).toBe(true);
       expect(providers.has('deepseek')).toBe(true);
       expect(providers.has('mistral')).toBe(true);
+      expect(providers.has('sakana')).toBe(true);
+      expect(providers.has('plamo')).toBe(true);
     });
 
     it('should return mutable map that allows modifications', () => {
@@ -228,6 +252,8 @@ describe('ChatServiceFactory', () => {
       expect(availableProviders).toContain('kimi');
       expect(availableProviders).toContain('deepseek');
       expect(availableProviders).toContain('mistral');
+      expect(availableProviders).toContain('sakana');
+      expect(availableProviders).toContain('plamo');
     });
 
     it('should include newly registered providers', () => {
@@ -251,6 +277,8 @@ describe('ChatServiceFactory', () => {
       expect(availableProviders).toContain('kimi');
       expect(availableProviders).toContain('deepseek');
       expect(availableProviders).toContain('mistral');
+      expect(availableProviders).toContain('sakana');
+      expect(availableProviders).toContain('plamo');
     });
   });
 
@@ -291,12 +319,160 @@ describe('ChatServiceFactory', () => {
       const mistralModels = ChatServiceFactory.getSupportedModels('mistral');
       expect(mistralModels).toEqual([
         'mistral-small-latest',
+        'ministral-3b-2512',
+        'ministral-8b-2512',
+        'ministral-14b-2512',
         'mistral-medium-3-5',
         'mistral-large-latest',
         'mistral-large-2512',
         'mistral-small-2603',
         'mistral-medium-2508',
       ]);
+
+      const sakanaModels = ChatServiceFactory.getSupportedModels('sakana');
+      expect(sakanaModels).toEqual([
+        'fugu',
+        'fugu-ultra',
+        'fugu-ultra-20260615',
+      ]);
+
+      const plamoModels = ChatServiceFactory.getSupportedModels('plamo');
+      expect(plamoModels).toEqual(['plamo-3.0-prime', 'plamo-2.2-prime']);
+    });
+  });
+
+  describe('getProviderCapabilities', () => {
+    it('returns machine-readable capabilities for a provider', () => {
+      const capabilities = ChatServiceFactory.getProviderCapabilities('openai');
+
+      expect(capabilities).toEqual(
+        expect.objectContaining({
+          provider: 'openai',
+          text: true,
+          streaming: true,
+          tools: true,
+          mcp: true,
+          jsonMode: true,
+          responseLength: true,
+        }),
+      );
+      expect(capabilities?.models.length).toBeGreaterThan(0);
+      expect(capabilities?.reasoningEffort).toContain('medium');
+      expect(capabilities?.reasoningEffort).toContain('max');
+    });
+
+    it('returns model-level vision support when a model is specified', () => {
+      const capabilities = ChatServiceFactory.getProviderCapabilities(
+        'openai-compatible',
+        'local-model',
+      );
+
+      expect(capabilities?.vision).toBe('unknown');
+      expect(capabilities?.tools).toBe(true);
+      expect(capabilities?.mcp).toBe(false);
+    });
+
+    it('returns xAI reasoning effort capabilities', () => {
+      const capabilities = ChatServiceFactory.getProviderCapabilities('xai');
+
+      expect(capabilities?.reasoningEffort).toEqual([
+        'none',
+        'low',
+        'medium',
+        'high',
+      ]);
+    });
+
+    it('returns Gemini reasoning effort capabilities', () => {
+      const capabilities = ChatServiceFactory.getProviderCapabilities('gemini');
+
+      expect(capabilities?.reasoningEffort).toEqual([
+        'minimal',
+        'low',
+        'medium',
+        'high',
+      ]);
+    });
+
+    it('returns model-aware Kimi reasoning effort capabilities', () => {
+      expect(
+        ChatServiceFactory.getProviderCapabilities('kimi', MODEL_KIMI_K3)
+          ?.reasoningEffort,
+      ).toEqual(['low', 'high', 'max']);
+      expect(
+        ChatServiceFactory.getProviderCapabilities('kimi', MODEL_KIMI_K2_6)
+          ?.reasoningEffort,
+      ).toEqual([]);
+    });
+
+    it('returns model-aware DeepSeek reasoning effort capabilities', () => {
+      expect(
+        ChatServiceFactory.getProviderCapabilities(
+          'deepseek',
+          MODEL_DEEPSEEK_V4_FLASH,
+        )?.reasoningEffort,
+      ).toEqual(['none', 'low', 'high', 'max']);
+      expect(
+        ChatServiceFactory.getProviderCapabilities(
+          'deepseek',
+          MODEL_DEEPSEEK_V4_PRO,
+        )?.reasoningEffort,
+      ).toEqual(['none', 'high', 'max']);
+    });
+
+    it('returns model-aware OpenRouter DeepSeek reasoning efforts', () => {
+      expect(
+        ChatServiceFactory.getProviderCapabilities(
+          'openrouter',
+          MODEL_OPENROUTER_DEEPSEEK_V4_FLASH,
+        )?.reasoningEffort,
+      ).toEqual(['none', 'high', 'xhigh']);
+      expect(
+        ChatServiceFactory.getProviderCapabilities(
+          'openrouter',
+          MODEL_OPENROUTER_DEEPSEEK_V4_FLASH_0731,
+        )?.reasoningEffort,
+      ).toEqual(['none', 'low', 'high', 'max']);
+    });
+
+    it('returns Claude reasoning effort capabilities', () => {
+      const capabilities = ChatServiceFactory.getProviderCapabilities('claude');
+
+      expect(capabilities?.reasoningEffort).toEqual([
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max',
+      ]);
+    });
+
+    it('returns model-aware Claude reasoning effort capabilities', () => {
+      expect(
+        ChatServiceFactory.getProviderCapabilities(
+          'claude',
+          MODEL_CLAUDE_5_OPUS,
+        )?.reasoningEffort,
+      ).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+      expect(
+        ChatServiceFactory.getProviderCapabilities(
+          'claude',
+          MODEL_CLAUDE_4_5_HAIKU,
+        )?.reasoningEffort,
+      ).toEqual([]);
+    });
+
+    it('returns undefined for unknown providers', () => {
+      expect(
+        ChatServiceFactory.getProviderCapabilities('unknown-provider'),
+      ).toBeUndefined();
+    });
+
+    it('returns capabilities for all registered providers', () => {
+      const capabilities = ChatServiceFactory.getAllProviderCapabilities();
+
+      expect(capabilities.map((item) => item.provider)).toContain('openai');
+      expect(capabilities.map((item) => item.provider)).toContain('plamo');
     });
   });
 
@@ -347,6 +523,8 @@ describe('ChatServiceFactory', () => {
       expect(providers.has('kimi')).toBe(true);
       expect(providers.has('deepseek')).toBe(true);
       expect(providers.has('mistral')).toBe(true);
+      expect(providers.has('sakana')).toBe(true);
+      expect(providers.has('plamo')).toBe(true);
       expect(providers.size).toBeGreaterThanOrEqual(3);
     });
   });

@@ -17,14 +17,45 @@ import {
   MODEL_GEMINI_NANO,
   type VisionSupportLevel,
   type ElevenLabsApplyTextNormalization,
+  type VoiceEngineVoice,
+  allowsReasoningMax,
   allowsReasoningLow,
   allowsReasoningMinimal,
   allowsReasoningNone,
   allowsReasoningXHigh,
+  getClaudeSupportedReasoningEfforts,
+  getDefaultClaudeReasoningEffort,
+  getDefaultDeepSeekReasoningEffort,
+  getDefaultGeminiReasoningEffort,
+  getDefaultKimiReasoningEffort,
+  getDefaultOpenRouterReasoningEffort,
   getDefaultReasoningEffortForGPT5Model,
+  getDefaultXaiReasoningEffort,
+  getDeepSeekSupportedReasoningEfforts,
+  getGeminiSupportedReasoningEfforts,
+  getKimiSupportedReasoningEfforts,
+  getOpenRouterSupportedReasoningEfforts,
+  getVoiceEngineVoiceList,
+  isClaudeReasoningEffortModel,
+  isDeepSeekReasoningEffortModel,
   isGPT5Model,
+  isGeminiReasoningEffortModel,
+  isKimiReasoningEffortModel,
   isResponsesOnlyGPT5Model,
+  isXaiReasoningEffortModel,
+  isXaiReasoningEffortNoneModel,
+  normalizeClaudeReasoningEffort,
+  normalizeDeepSeekReasoningEffort,
+  normalizeGeminiReasoningEffort,
+  normalizeOpenRouterReasoningEffort,
+  normalizeXaiReasoningEffort,
   refreshOpenRouterFreeModels,
+  type ClaudeReasoningEffort,
+  type DeepSeekReasoningEffort,
+  type GeminiReasoningEffort,
+  type KimiReasoningEffort,
+  type OpenRouterReasoningEffort,
+  type XaiReasoningEffort,
   type MinimaxModel,
   type MinimaxAudioFormat,
   type UnrealSpeechCodec,
@@ -51,6 +82,8 @@ import { kimiModels } from './constants/kimi';
 import { xaiModels } from './constants/xai';
 import { deepseekModels } from './constants/deepseek';
 import { mistralModels } from './constants/mistral';
+import { sakanaModels } from './constants/sakana';
+import { plamoModels } from './constants/plamo';
 import { openrouterModels } from './constants/openrouter';
 import {
   type VoiceEngineType,
@@ -107,8 +140,83 @@ type ReasoningEffortLevel =
   | 'low'
   | 'medium'
   | 'high'
-  | 'xhigh';
+  | 'xhigh'
+  | 'max';
 type ChatProvider = NonNullable<AITuberOnAirCoreOptions['chatProvider']>;
+
+const normalizeReasoningEffortForClaudeModel = (
+  targetModel: string | undefined,
+  effort?: ReasoningEffortLevel,
+): ClaudeReasoningEffort | undefined => {
+  if (!targetModel) {
+    return undefined;
+  }
+
+  const requestedEffort: ClaudeReasoningEffort | undefined =
+    effort === 'low' ||
+    effort === 'medium' ||
+    effort === 'high' ||
+    effort === 'xhigh' ||
+    effort === 'max'
+      ? effort
+      : undefined;
+
+  return normalizeClaudeReasoningEffort(targetModel, requestedEffort);
+};
+
+const normalizeReasoningEffortForKimiModel = (
+  targetModel: string | undefined,
+  effort?: ReasoningEffortLevel,
+): KimiReasoningEffort | undefined => {
+  if (!targetModel) {
+    return undefined;
+  }
+
+  const supportedEfforts = getKimiSupportedReasoningEfforts(targetModel);
+  const requestedEffort: KimiReasoningEffort | undefined =
+    effort === 'low' || effort === 'high' || effort === 'max'
+      ? effort
+      : undefined;
+
+  if (requestedEffort && supportedEfforts.includes(requestedEffort)) {
+    return requestedEffort;
+  }
+
+  return getDefaultKimiReasoningEffort(targetModel) ?? supportedEfforts[0];
+};
+
+const normalizeReasoningEffortForDeepSeekModel = (
+  targetModel: string | undefined,
+  effort?: ReasoningEffortLevel,
+): DeepSeekReasoningEffort | undefined => {
+  if (!targetModel) {
+    return undefined;
+  }
+
+  const requestedEffort: DeepSeekReasoningEffort | undefined =
+    effort === 'none' ||
+    effort === 'low' ||
+    effort === 'high' ||
+    effort === 'max'
+      ? effort
+      : undefined;
+
+  return normalizeDeepSeekReasoningEffort(targetModel, requestedEffort);
+};
+
+const normalizeReasoningEffortForOpenRouterModel = (
+  targetModel: string | undefined,
+  effort?: ReasoningEffortLevel,
+): OpenRouterReasoningEffort | undefined => {
+  if (!targetModel) {
+    return undefined;
+  }
+
+  return normalizeOpenRouterReasoningEffort(
+    targetModel,
+    effort as OpenRouterReasoningEffort | undefined,
+  );
+};
 
 // MiniMax Voice IDs with descriptions
 const MINIMAX_VOICES: Record<string, string> = {
@@ -515,7 +623,32 @@ const App: React.FC = () => {
     if (effort === 'xhigh' && !allowsReasoningXHigh(targetModel)) {
       return 'high';
     }
+    if (effort === 'max' && !allowsReasoningMax(targetModel)) {
+      return allowsReasoningXHigh(targetModel) ? 'xhigh' : 'high';
+    }
     return effort;
+  };
+
+  const normalizeReasoningEffortForXaiModel = (
+    targetModel: string | undefined,
+    effort?: ReasoningEffortLevel,
+  ): XaiReasoningEffort => {
+    const defaultEffort = targetModel
+      ? getDefaultXaiReasoningEffort(targetModel)
+      : undefined;
+    if (!effort) {
+      return defaultEffort ?? 'none';
+    }
+    if (effort === 'minimal') {
+      return 'low';
+    }
+    const supportedEffort =
+      effort === 'xhigh' || effort === 'max' ? 'high' : effort;
+    return (
+      normalizeXaiReasoningEffort(targetModel || '', supportedEffort) ??
+      defaultEffort ??
+      'none'
+    );
   };
 
   // chat messages state
@@ -751,6 +884,10 @@ const App: React.FC = () => {
   >('default');
   const [piperPlusSpeed, setPiperPlusSpeed] = useState<string>('');
   const [piperPlusNoiseScale, setPiperPlusNoiseScale] = useState<string>('');
+  const [webSpeechRate, setWebSpeechRate] = useState<string>('1');
+  const [webSpeechPitch, setWebSpeechPitch] = useState<string>('1');
+  const [webSpeechVolume, setWebSpeechVolume] = useState<string>('1');
+  const [webSpeechLanguage, setWebSpeechLanguage] = useState<string>('ja-JP');
   const [selectedSpeakers, setSelectedSpeakers] = useState<
     Record<string, string | number>
   >({
@@ -768,6 +905,7 @@ const App: React.FC = () => {
     inworld: '',
     gradium: 'YTpq7expH9539ERJ',
     piperPlus: 'default',
+    webSpeech: '',
   });
   const [availableSpeakers, setAvailableSpeakers] = useState<
     Record<string, any[]>
@@ -842,6 +980,17 @@ const App: React.FC = () => {
           }
           break;
         }
+        case 'webSpeech': {
+          const voices = await getVoiceEngineVoiceList('webSpeech');
+          setAvailableSpeakers((prev) => ({ ...prev, webSpeech: voices }));
+          if (!selectedSpeakers.webSpeech && voices.length > 0) {
+            setSelectedSpeakers((prev) => ({
+              ...prev,
+              webSpeech: voices[0].id,
+            }));
+          }
+          break;
+        }
       }
     } catch (error) {
       console.error(`Failed to fetch speakers for ${engine}:`, error);
@@ -853,7 +1002,9 @@ const App: React.FC = () => {
    */
   useEffect(() => {
     if (selectedVoiceEngine !== 'none') {
-      if (['voicevox', 'aivisSpeech'].includes(selectedVoiceEngine)) {
+      if (
+        ['voicevox', 'aivisSpeech', 'webSpeech'].includes(selectedVoiceEngine)
+      ) {
         fetchSpeakers(selectedVoiceEngine);
       }
     }
@@ -1208,30 +1359,54 @@ const App: React.FC = () => {
         break;
       case 'gemini':
         setModel(geminiModels[0]);
+        setReasoningEffort(
+          getDefaultGeminiReasoningEffort(geminiModels[0]) ?? 'minimal',
+        );
         break;
       case 'gemini-nano':
         setModel(MODEL_GEMINI_NANO);
         break;
       case 'claude':
         setModel(claudeModels[0]);
+        setReasoningEffort(
+          getDefaultClaudeReasoningEffort(claudeModels[0]) ?? 'high',
+        );
         break;
       case 'zai':
         setModel(zaiModels[0]);
         break;
       case 'kimi':
         setModel(kimiModels[0]);
+        setReasoningEffort(
+          getDefaultKimiReasoningEffort(kimiModels[0]) ?? 'max',
+        );
         break;
       case 'xai':
         setModel(xaiModels[0]);
+        setReasoningEffort(
+          getDefaultXaiReasoningEffort(xaiModels[0]) ?? 'none',
+        );
         break;
       case 'deepseek':
         setModel(deepseekModels[0]);
+        setReasoningEffort(
+          getDefaultDeepSeekReasoningEffort(deepseekModels[0]) ?? 'none',
+        );
         break;
       case 'mistral':
         setModel(mistralModels[0]);
         break;
+      case 'sakana':
+        setModel(sakanaModels[0]);
+        break;
+      case 'plamo':
+        setModel(plamoModels[0]);
+        break;
       case 'openrouter':
         setModel(openrouterModels[0]);
+        setReasoningEffort(
+          getDefaultOpenRouterReasoningEffort(openrouterModels[0]) ?? 'none',
+        );
         break;
       case 'openai-compatible':
         setModel(OPENAI_COMPATIBLE_DEFAULT_MODEL);
@@ -1276,6 +1451,104 @@ const App: React.FC = () => {
   }, [chatProvider, model, gpt5Preset, reasoning_effort, responseLength]);
 
   useEffect(() => {
+    if (
+      chatProvider !== 'claude' ||
+      !model ||
+      !isClaudeReasoningEffortModel(model)
+    ) {
+      return;
+    }
+    const normalized = normalizeReasoningEffortForClaudeModel(
+      model,
+      reasoning_effort,
+    );
+    if (normalized && normalized !== reasoning_effort) {
+      setReasoningEffort(normalized);
+    }
+  }, [chatProvider, model, reasoning_effort]);
+
+  useEffect(() => {
+    if (
+      chatProvider !== 'gemini' ||
+      !model ||
+      !isGeminiReasoningEffortModel(model)
+    ) {
+      return;
+    }
+    const requestedEffort: GeminiReasoningEffort | undefined =
+      reasoning_effort === 'minimal' ||
+      reasoning_effort === 'low' ||
+      reasoning_effort === 'medium' ||
+      reasoning_effort === 'high'
+        ? reasoning_effort
+        : undefined;
+    const normalized = normalizeGeminiReasoningEffort(model, requestedEffort);
+    if (normalized && normalized !== reasoning_effort) {
+      setReasoningEffort(normalized);
+    }
+  }, [chatProvider, model, reasoning_effort]);
+
+  useEffect(() => {
+    if (chatProvider !== 'xai' || !model || !isXaiReasoningEffortModel(model)) {
+      return;
+    }
+    const normalized = normalizeReasoningEffortForXaiModel(
+      model,
+      reasoning_effort,
+    );
+    if (normalized !== reasoning_effort) {
+      setReasoningEffort(normalized);
+    }
+  }, [chatProvider, model, reasoning_effort]);
+
+  useEffect(() => {
+    if (
+      chatProvider !== 'kimi' ||
+      !model ||
+      !isKimiReasoningEffortModel(model)
+    ) {
+      return;
+    }
+    const normalized = normalizeReasoningEffortForKimiModel(
+      model,
+      reasoning_effort,
+    );
+    if (normalized && normalized !== reasoning_effort) {
+      setReasoningEffort(normalized);
+    }
+  }, [chatProvider, model, reasoning_effort]);
+
+  useEffect(() => {
+    if (
+      chatProvider !== 'deepseek' ||
+      !model ||
+      !isDeepSeekReasoningEffortModel(model)
+    ) {
+      return;
+    }
+    const normalized = normalizeReasoningEffortForDeepSeekModel(
+      model,
+      reasoning_effort,
+    );
+    if (normalized && normalized !== reasoning_effort) {
+      setReasoningEffort(normalized);
+    }
+  }, [chatProvider, model, reasoning_effort]);
+
+  useEffect(() => {
+    if (chatProvider !== 'openrouter' || !model) {
+      return;
+    }
+    const normalized = normalizeReasoningEffortForOpenRouterModel(
+      model,
+      reasoning_effort,
+    );
+    if (normalized && normalized !== reasoning_effort) {
+      setReasoningEffort(normalized);
+    }
+  }, [chatProvider, model, reasoning_effort]);
+
+  useEffect(() => {
     if (chatProvider !== 'openai' || !model) {
       return;
     }
@@ -1291,14 +1564,18 @@ const App: React.FC = () => {
    * when GPT-5 preset changes, update verbosity and reasoning_effort
    */
   useEffect(() => {
-    if (gpt5Preset !== 'custom' && gpt5Preset in GPT5_PRESETS) {
+    if (
+      chatProvider === 'openai' &&
+      gpt5Preset !== 'custom' &&
+      gpt5Preset in GPT5_PRESETS
+    ) {
       const preset = GPT5_PRESETS[gpt5Preset];
       setVerbosity(preset.verbosity);
       setReasoningEffort(
         normalizeReasoningEffortForModel(model, preset.reasoning_effort),
       );
     }
-  }, [gpt5Preset, model]);
+  }, [chatProvider, gpt5Preset, model]);
 
   useEffect(() => {
     saveOpenRouterDynamicState(openRouterDynamicState);
@@ -1425,13 +1702,63 @@ const App: React.FC = () => {
         ? 'responses'
         : gpt5EndpointPreference;
     }
+    if (chatProvider === 'xai' && model && isXaiReasoningEffortModel(model)) {
+      providerOptions.reasoning_effort = normalizeReasoningEffortForXaiModel(
+        model,
+        reasoning_effort,
+      );
+    }
+    if (
+      chatProvider === 'claude' &&
+      model &&
+      isClaudeReasoningEffortModel(model)
+    ) {
+      providerOptions.reasoning_effort = normalizeReasoningEffortForClaudeModel(
+        model,
+        reasoning_effort,
+      );
+    }
+    if (
+      chatProvider === 'gemini' &&
+      model &&
+      isGeminiReasoningEffortModel(model)
+    ) {
+      const requestedEffort: GeminiReasoningEffort | undefined =
+        reasoning_effort === 'minimal' ||
+        reasoning_effort === 'low' ||
+        reasoning_effort === 'medium' ||
+        reasoning_effort === 'high'
+          ? reasoning_effort
+          : undefined;
+      providerOptions.reasoning_effort = normalizeGeminiReasoningEffort(
+        model,
+        requestedEffort,
+      );
+    }
     if (chatProvider === 'kimi') {
+      if (model && isKimiReasoningEffortModel(model)) {
+        providerOptions.reasoning_effort = normalizeReasoningEffortForKimiModel(
+          model,
+          reasoning_effort,
+        );
+      }
       const trimmedBaseUrl = kimiBaseUrl.trim();
       if (trimmedBaseUrl) {
         providerOptions.baseUrl = trimmedBaseUrl;
       }
     }
+    if (
+      chatProvider === 'deepseek' &&
+      model &&
+      isDeepSeekReasoningEffortModel(model)
+    ) {
+      providerOptions.reasoning_effort =
+        normalizeReasoningEffortForDeepSeekModel(model, reasoning_effort);
+    }
     if (chatProvider === 'openrouter') {
+      providerOptions.reasoning_effort =
+        normalizeReasoningEffortForOpenRouterModel(model, reasoning_effort) ??
+        'none';
       const trimmedBaseUrl = openRouterBaseUrl.trim();
       if (trimmedBaseUrl) {
         providerOptions.baseUrl = trimmedBaseUrl;
@@ -2111,8 +2438,9 @@ const App: React.FC = () => {
             options.gradiumTemperature = parsedTemperature;
           }
 
-          const parsedVoiceSimilarity =
-            Number.parseFloat(gradiumVoiceSimilarity);
+          const parsedVoiceSimilarity = Number.parseFloat(
+            gradiumVoiceSimilarity,
+          );
           if (!Number.isNaN(parsedVoiceSimilarity)) {
             options.gradiumVoiceSimilarity = parsedVoiceSimilarity;
           }
@@ -2144,6 +2472,22 @@ const App: React.FC = () => {
             options.piperPlusNoiseScale = parsedNoiseScale;
           }
 
+          break;
+        }
+        case 'webSpeech': {
+          const parsedRate = Number.parseFloat(webSpeechRate);
+          const parsedPitch = Number.parseFloat(webSpeechPitch);
+          const parsedVolume = Number.parseFloat(webSpeechVolume);
+          if (!Number.isNaN(parsedRate)) {
+            options.webSpeechRate = parsedRate;
+          }
+          if (!Number.isNaN(parsedPitch)) {
+            options.webSpeechPitch = parsedPitch;
+          }
+          if (!Number.isNaN(parsedVolume)) {
+            options.webSpeechVolume = parsedVolume;
+          }
+          options.webSpeechLanguage = webSpeechLanguage.trim() || undefined;
           break;
         }
       }
@@ -2503,6 +2847,67 @@ const App: React.FC = () => {
   const allowsXHighReasoningEffort = Boolean(
     chatProvider === 'openai' && model && allowsReasoningXHigh(model),
   );
+  const allowsMaxReasoningEffort = Boolean(
+    chatProvider === 'openai' && model && allowsReasoningMax(model),
+  );
+  const allowsXaiNoneReasoningEffort = Boolean(
+    chatProvider === 'xai' && model && isXaiReasoningEffortNoneModel(model),
+  );
+  const isXaiReasoningEffortModelSelected = Boolean(
+    chatProvider === 'xai' && model && isXaiReasoningEffortModel(model),
+  );
+  const xaiReasoningEffortValue: XaiReasoningEffort =
+    isXaiReasoningEffortModelSelected
+      ? normalizeReasoningEffortForXaiModel(model, reasoning_effort)
+      : 'none';
+  const claudeSupportedReasoningEfforts =
+    chatProvider === 'claude' && model
+      ? getClaudeSupportedReasoningEfforts(model)
+      : [];
+  const isClaudeReasoningEffortModelSelected =
+    claudeSupportedReasoningEfforts.length > 0;
+  const claudeReasoningEffortValue = normalizeReasoningEffortForClaudeModel(
+    model,
+    reasoning_effort,
+  );
+  const geminiSupportedReasoningEfforts =
+    chatProvider === 'gemini' && model
+      ? getGeminiSupportedReasoningEfforts(model)
+      : [];
+  const isGeminiReasoningEffortModelSelected =
+    geminiSupportedReasoningEfforts.length > 0;
+  const requestedGeminiReasoningEffort: GeminiReasoningEffort | undefined =
+    reasoning_effort === 'minimal' ||
+    reasoning_effort === 'low' ||
+    reasoning_effort === 'medium' ||
+    reasoning_effort === 'high'
+      ? reasoning_effort
+      : undefined;
+  const geminiReasoningEffortValue = model
+    ? normalizeGeminiReasoningEffort(model, requestedGeminiReasoningEffort)
+    : undefined;
+  const kimiSupportedReasoningEfforts =
+    chatProvider === 'kimi' && model
+      ? getKimiSupportedReasoningEfforts(model)
+      : [];
+  const isKimiReasoningEffortModelSelected =
+    kimiSupportedReasoningEfforts.length > 0;
+  const kimiReasoningEffortValue: KimiReasoningEffort =
+    normalizeReasoningEffortForKimiModel(model, reasoning_effort) ?? 'max';
+  const deepSeekSupportedReasoningEfforts =
+    chatProvider === 'deepseek' && model
+      ? getDeepSeekSupportedReasoningEfforts(model)
+      : [];
+  const deepSeekReasoningEffortValue: DeepSeekReasoningEffort =
+    normalizeReasoningEffortForDeepSeekModel(model, reasoning_effort) ??
+    'none';
+  const openRouterSupportedReasoningEfforts =
+    chatProvider === 'openrouter' && model
+      ? getOpenRouterSupportedReasoningEfforts(model)
+      : [];
+  const openRouterReasoningEffortValue: OpenRouterReasoningEffort =
+    normalizeReasoningEffortForOpenRouterModel(model, reasoning_effort) ??
+    'none';
   const getResponseLengthOptionLabel = (length: ChatResponseLength): string => {
     const label = RESPONSE_LENGTH_LABELS[length];
     const baseTokens = RESPONSE_LENGTH_BASE_TOKENS[length];
@@ -2806,6 +3211,10 @@ const App: React.FC = () => {
                     <option value="xai">xAI</option>
                     <option value="deepseek">DeepSeek</option>
                     <option value="mistral">Mistral</option>
+                    <option value="sakana" disabled>
+                      Sakana AI (Node/backend only)
+                    </option>
+                    <option value="plamo">PLaMo</option>
                     <option value="openrouter">OpenRouter</option>
                     <option value="openai-compatible">OpenAI-Compatible</option>
                   </select>
@@ -2875,6 +3284,18 @@ const App: React.FC = () => {
                         ))}
                       {chatProvider === 'mistral' &&
                         mistralModels.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      {chatProvider === 'sakana' &&
+                        sakanaModels.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      {chatProvider === 'plamo' &&
+                        plamoModels.map((m) => (
                           <option key={m} value={m}>
                             {m}
                           </option>
@@ -2956,6 +3377,42 @@ const App: React.FC = () => {
 
                   {chatProvider === 'kimi' && (
                     <>
+                      {isKimiReasoningEffortModelSelected && (
+                        <>
+                          <label htmlFor="kimiReasoningEffort">
+                            Kimi Reasoning Effort:
+                          </label>
+                          <select
+                            id="kimiReasoningEffort"
+                            value={kimiReasoningEffortValue}
+                            onChange={(e) =>
+                              setReasoningEffort(
+                                e.target.value as KimiReasoningEffort,
+                              )
+                            }
+                          >
+                            {kimiSupportedReasoningEfforts.map((effort) => (
+                              <option key={effort} value={effort}>
+                                {effort === 'max'
+                                  ? 'Max (API default)'
+                                  : effort.charAt(0).toUpperCase() +
+                                    effort.slice(1)}
+                              </option>
+                            ))}
+                          </select>
+                          <div
+                            style={{
+                              marginTop: '6px',
+                              marginBottom: '12px',
+                              color: '#666',
+                              fontSize: '12px',
+                            }}
+                          >
+                            Kimi K3 always reasons. Use Low for shorter
+                            reasoning, or Max to keep the API default.
+                          </div>
+                        </>
+                      )}
                       <label htmlFor="kimiBaseUrl">Base URL (optional):</label>
                       <input
                         id="kimiBaseUrl"
@@ -2964,6 +3421,42 @@ const App: React.FC = () => {
                         value={kimiBaseUrl}
                         onChange={(e) => setKimiBaseUrl(e.target.value)}
                       />
+                    </>
+                  )}
+
+                  {chatProvider === 'deepseek' && (
+                    <>
+                      <label htmlFor="deepSeekReasoningEffort">
+                        DeepSeek Reasoning Effort:
+                      </label>
+                      <select
+                        id="deepSeekReasoningEffort"
+                        value={deepSeekReasoningEffortValue}
+                        onChange={(e) =>
+                          setReasoningEffort(
+                            e.target.value as DeepSeekReasoningEffort,
+                          )
+                        }
+                      >
+                        {deepSeekSupportedReasoningEfforts.map((effort) => (
+                          <option key={effort} value={effort}>
+                            {effort === 'none'
+                              ? 'None (fastest)'
+                              : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                          </option>
+                        ))}
+                      </select>
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          marginBottom: '12px',
+                          color: '#666',
+                          fontSize: '12px',
+                        }}
+                      >
+                        None disables thinking for responsive chat. Thinking
+                        with tool calling is not supported yet.
+                      </div>
                     </>
                   )}
 
@@ -2979,6 +3472,39 @@ const App: React.FC = () => {
                         value={openRouterBaseUrl}
                         onChange={(e) => setOpenRouterBaseUrl(e.target.value)}
                       />
+                      <label htmlFor="openRouterReasoningEffort">
+                        Reasoning Effort:
+                      </label>
+                      <select
+                        id="openRouterReasoningEffort"
+                        value={openRouterReasoningEffortValue}
+                        onChange={(e) =>
+                          setReasoningEffort(
+                            e.target.value as OpenRouterReasoningEffort,
+                          )
+                        }
+                      >
+                        {openRouterSupportedReasoningEfforts.map((effort) => (
+                          <option key={effort} value={effort}>
+                            {effort === 'none'
+                              ? 'None (fastest)'
+                              : effort === 'xhigh'
+                                ? 'XHigh'
+                                : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                          </option>
+                        ))}
+                      </select>
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          marginBottom: '12px',
+                          color: '#666',
+                          fontSize: '12px',
+                        }}
+                      >
+                        Options follow the selected model. None explicitly
+                        disables reasoning for faster responses.
+                      </div>
                       <label htmlFor="openRouterMaxCandidates">
                         Max candidates:
                       </label>
@@ -3102,6 +3628,130 @@ const App: React.FC = () => {
                     </div>
                   )}
 
+                  {chatProvider === 'xai' && (
+                    <div style={{ marginTop: '16px' }}>
+                      <label htmlFor="xaiReasoningEffort">
+                        xAI Reasoning Effort:
+                      </label>
+                      <select
+                        id="xaiReasoningEffort"
+                        value={xaiReasoningEffortValue}
+                        disabled={!isXaiReasoningEffortModelSelected}
+                        onChange={(e) =>
+                          setReasoningEffort(
+                            e.target.value as ReasoningEffortLevel,
+                          )
+                        }
+                      >
+                        {allowsXaiNoneReasoningEffort && (
+                          <option value="none">None</option>
+                        )}
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          color: '#666',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {isXaiReasoningEffortModelSelected
+                          ? model === 'grok-4.5'
+                            ? 'Grok 4.5 uses low by default; none is not supported.'
+                            : 'Grok 4.3 uses none by default for lower latency.'
+                          : 'This xAI model does not support reasoning_effort.'}
+                      </div>
+                    </div>
+                  )}
+
+                  {chatProvider === 'claude' && (
+                    <div style={{ marginTop: '16px' }}>
+                      <label htmlFor="claudeReasoningEffort">
+                        Claude Reasoning Effort:
+                      </label>
+                      <select
+                        id="claudeReasoningEffort"
+                        value={claudeReasoningEffortValue ?? ''}
+                        disabled={!isClaudeReasoningEffortModelSelected}
+                        onChange={(e) =>
+                          setReasoningEffort(
+                            e.target.value as ClaudeReasoningEffort,
+                          )
+                        }
+                      >
+                        {!isClaudeReasoningEffortModelSelected && (
+                          <option value="">Not available</option>
+                        )}
+                        {claudeSupportedReasoningEfforts.map((effort) => (
+                          <option key={effort} value={effort}>
+                            {effort === 'low'
+                              ? 'Low (fastest)'
+                              : effort === 'high'
+                                ? 'High (API default)'
+                                : effort === 'xhigh'
+                                  ? 'XHigh'
+                                  : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                          </option>
+                        ))}
+                      </select>
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          color: '#666',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {isClaudeReasoningEffortModelSelected
+                          ? 'Mapped to Claude output_config.effort. Lower effort prioritizes latency and token efficiency.'
+                          : 'The selected Claude model does not expose configurable effort.'}
+                      </div>
+                    </div>
+                  )}
+
+                  {chatProvider === 'gemini' && (
+                    <div style={{ marginTop: '16px' }}>
+                      <label htmlFor="geminiReasoningEffort">
+                        Gemini Reasoning Effort:
+                      </label>
+                      <select
+                        id="geminiReasoningEffort"
+                        value={geminiReasoningEffortValue ?? ''}
+                        disabled={!isGeminiReasoningEffortModelSelected}
+                        onChange={(e) =>
+                          setReasoningEffort(
+                            e.target.value as GeminiReasoningEffort,
+                          )
+                        }
+                      >
+                        {!isGeminiReasoningEffortModelSelected && (
+                          <option value="">Not available</option>
+                        )}
+                        {geminiSupportedReasoningEfforts.map((effort) => (
+                          <option key={effort} value={effort}>
+                            {effort === 'minimal'
+                              ? 'Minimal (fastest)'
+                              : `${effort[0].toUpperCase()}${effort.slice(1)}`}
+                          </option>
+                        ))}
+                      </select>
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          color: '#666',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {isGeminiReasoningEffortModelSelected
+                          ? geminiSupportedReasoningEfforts.includes('minimal')
+                            ? 'Mapped to Gemini thinkingLevel. Minimal is optimized for chat latency.'
+                            : 'Mapped to Gemini thinkingLevel. Low is the lowest level supported by Gemini 3 Pro.'
+                          : 'Gemini 2.5 uses thinkingBudget; other models may not expose configurable thinkingLevel.'}
+                      </div>
+                    </div>
+                  )}
+
                   {/* GPT-5 specific settings */}
                   {isOpenAIGPT5ModelSelected && (
                     <div style={{ marginTop: '16px' }}>
@@ -3175,6 +3825,9 @@ const App: React.FC = () => {
                               <option value="high">High</option>
                               {allowsXHighReasoningEffort && (
                                 <option value="xhigh">XHigh</option>
+                              )}
+                              {allowsMaxReasoningEffort && (
+                                <option value="max">Max</option>
                               )}
                             </select>
                           </>
@@ -4722,6 +5375,68 @@ const App: React.FC = () => {
                     </div>
                   )}
 
+                  {selectedVoiceEngine === 'webSpeech' && (
+                    <div
+                      style={{
+                        marginTop: '12px',
+                        padding: '12px',
+                        backgroundColor: '#f3f8ff',
+                        borderRadius: '8px',
+                        border: '1px solid #b6d4fe',
+                      }}
+                    >
+                      <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+                        Web Speech パラメータ
+                      </div>
+                      <label htmlFor="webSpeechLanguage">Language:</label>
+                      <input
+                        id="webSpeechLanguage"
+                        type="text"
+                        value={webSpeechLanguage}
+                        onChange={(e) => setWebSpeechLanguage(e.target.value)}
+                        placeholder="ja-JP"
+                        style={{ width: '100%', marginBottom: '8px' }}
+                      />
+                      <label htmlFor="webSpeechRate">Rate (0.1–10):</label>
+                      <input
+                        id="webSpeechRate"
+                        type="number"
+                        min="0.1"
+                        max="10"
+                        step="0.1"
+                        value={webSpeechRate}
+                        onChange={(e) => setWebSpeechRate(e.target.value)}
+                        style={{ width: '100%', marginBottom: '8px' }}
+                      />
+                      <label htmlFor="webSpeechPitch">Pitch (0–2):</label>
+                      <input
+                        id="webSpeechPitch"
+                        type="number"
+                        min="0"
+                        max="2"
+                        step="0.1"
+                        value={webSpeechPitch}
+                        onChange={(e) => setWebSpeechPitch(e.target.value)}
+                        style={{ width: '100%', marginBottom: '8px' }}
+                      />
+                      <label htmlFor="webSpeechVolume">Volume (0–1):</label>
+                      <input
+                        id="webSpeechVolume"
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={webSpeechVolume}
+                        onChange={(e) => setWebSpeechVolume(e.target.value)}
+                        style={{ width: '100%', marginBottom: '8px' }}
+                      />
+                      <div style={{ fontSize: '0.8em', color: '#5c677d' }}>
+                        ブラウザが直接再生するため音声バッファを取得できず、
+                        リップシンクには対応していません。
+                      </div>
+                    </div>
+                  )}
+
                   {selectedVoiceEngine === 'voicevox' && (
                     <div
                       style={{
@@ -6110,6 +6825,17 @@ const App: React.FC = () => {
                           {selectedVoiceEngine === 'piperPlus' && (
                             <option value="default">default</option>
                           )}
+
+                          {selectedVoiceEngine === 'webSpeech' &&
+                            (
+                              availableSpeakers.webSpeech as
+                                | VoiceEngineVoice[]
+                                | undefined
+                            )?.map((voice) => (
+                              <option key={voice.id} value={voice.id}>
+                                {voice.label}
+                              </option>
+                            ))}
                         </select>
                       </>
                     )}
@@ -6146,12 +6872,15 @@ const App: React.FC = () => {
                                           : selectedVoiceEngine === 'piperPlus'
                                             ? 'Piper Plusでは public/piper/ 配下のWASM assetsを使ってブラウザ内で音声合成します'
                                             : selectedVoiceEngine ===
-                                                'aivisCloud'
-                                              ? 'Aivis CloudではモデルUUIDや各種出力パラメータを任意に指定できます'
+                                                'webSpeech'
+                                              ? 'Web Speech APIはブラウザが直接再生します。音声バッファを取得できないためリップシンク非対応です'
                                               : selectedVoiceEngine ===
-                                                  'aivisSpeech'
-                                                ? 'AivisSpeechでは抑揚やテンポ緩急など独自パラメータを設定できます'
-                                                : '※ 音声パラメータは最適な値に固定されています'}
+                                                  'aivisCloud'
+                                                ? 'Aivis CloudではモデルUUIDや各種出力パラメータを任意に指定できます'
+                                                : selectedVoiceEngine ===
+                                                    'aivisSpeech'
+                                                  ? 'AivisSpeechでは抑揚やテンポ緩急など独自パラメータを設定できます'
+                                                  : '※ 音声パラメータは最適な値に固定されています'}
                     </div>
                   )}
                 </div>

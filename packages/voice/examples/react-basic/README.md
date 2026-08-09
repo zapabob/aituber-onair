@@ -4,14 +4,18 @@ This is a React + Vite example demonstrating how to use the `@aituber-onair/voic
 
 ## 🎯 Why React Example?
 
-This example solves all the problems with the HTML-based examples:
+This example solves the local development problems with the HTML-based examples:
 
-- ✅ **No CORS issues** - Vite dev server handles everything
+- ✅ **No local file/module CORS issues** - Vite dev server handles local assets and imports
 - ✅ **No .js extension problems** - Bundler resolves imports automatically  
 - ✅ **Hot reload** - Fast development experience
 - ✅ **TypeScript support** - Full type safety
 - ✅ **Production ready** - Can be built and deployed
 - ✅ **Familiar workflow** - Standard React + Vite development
+
+Provider APIs can still enforce their own browser CORS policies. If a supported
+cloud voice-list endpoint rejects direct browser requests, use a backend
+relay/proxy for that lookup in production.
 
 ## 🚀 Quick Start
 
@@ -54,6 +58,7 @@ The app will open at `http://localhost:3000` with hot reload enabled.
 - **AIVIS Speech** - Emotion-aware synthesis
 - **VoicePeak** - Professional voice synthesis with single-tag and weighted emotion UI (`vpeakserver v0.2.0+` required for weighted mode)
 - **MiniMax** - Advanced Chinese/Japanese TTS
+- **Web Speech API** - Browser-native speechSynthesis playback with no API key and sample-side language filtering
 
 ### Dynamic Configuration
 
@@ -126,6 +131,10 @@ The built files will be in the `dist/` directory and can be deployed to any stat
 #### MiniMax
 ```bash
 # API key format: "your-api-key:your-group-id"
+# MiniMax uses documented system voice IDs. This example shows representative
+# presets from https://platform.minimax.io/docs/faq/system-voice-id instead of
+# fetching a dynamic voice list, because the linked Get Voice API is currently
+# unavailable.
 ```
 
 #### OpenAI TTS
@@ -149,9 +158,27 @@ The built files will be in the `dist/` directory and can be deployed to any stat
 #### Gradium TTS
 ```bash
 # Default endpoint: https://api.gradium.ai/api/post/speech/tts
-# Enter a Gradium API key, then select one of the built-in flagship voices.
-# The dynamic voice-list endpoint is not used in this browser example because
-# it may be blocked by CORS even when TTS generation itself is allowed.
+# Enter a Gradium API key, then try fetching voices or select a built-in
+# flagship voice preset.
+# If the voice-list request fails CORS in the browser, use a backend proxy for
+# dynamic voice selection in production.
+```
+
+#### Aivis Cloud
+```bash
+# Default endpoint: https://api.aivis-project.com/v1/tts/synthesize
+# The synthesis endpoint can be used from the browser, but Aivis Cloud
+# model/list APIs such as /v1/aivm-models/search may fail browser CORS checks.
+# This example keeps fixed model UUID input. For dynamic model selection, call
+# getVoiceEngineVoiceList('aivisCloud') from a Node.js backend or proxy in
+# production.
+```
+
+#### Web Speech API
+```bash
+# No API key or server is required. The browser plays audio directly through
+# window.speechSynthesis, so audio ArrayBuffer callbacks are not available.
+# Use the "Browser voice list" button to select a local browser voice.
 ```
 
 ## Piper Plus Setup
@@ -218,7 +245,7 @@ The Piper Plus engine uses the following third-party components. By downloading 
 
 1. **Import errors** - `npm run dev` and `npm run build` rebuild `@aituber-onair/voice` automatically. If you still see stale behavior, restart the dev server once.
 2. **API errors** - Check your API keys and ensure services are running
-3. **CORS errors** - For browser use, the target server must return proper CORS headers. If it does not, use your own backend relay/proxy in production.
+3. **CORS errors** - For browser use, the target server or provider API must return proper CORS headers. If it does not, use your own backend relay/proxy in production. This can affect supported cloud voice-list endpoints even when synthesis itself works.
 
 ### Audio Playback
 

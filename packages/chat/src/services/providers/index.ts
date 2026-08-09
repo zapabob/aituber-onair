@@ -7,6 +7,8 @@ import { MistralChatServiceProvider } from './mistral/MistralChatServiceProvider
 import { OpenAICompatibleChatServiceProvider } from './openaiCompatible/OpenAICompatibleChatServiceProvider';
 import { OpenAIChatServiceProvider } from './openai/OpenAIChatServiceProvider';
 import { OpenRouterChatServiceProvider } from './openrouter/OpenRouterChatServiceProvider';
+import { PlamoChatServiceProvider } from './plamo/PlamoChatServiceProvider';
+import { SakanaChatServiceProvider } from './sakana/SakanaChatServiceProvider';
 import { XAIChatServiceProvider } from './xai/XAIChatServiceProvider';
 import { ZAIChatServiceProvider } from './zai/ZAIChatServiceProvider';
 
@@ -22,4 +24,6 @@ export const DEFAULT_CHAT_SERVICE_PROVIDERS = [
   new KimiChatServiceProvider(),
   new DeepSeekChatServiceProvider(),
   new MistralChatServiceProvider(),
+  new SakanaChatServiceProvider(),
+  new PlamoChatServiceProvider(),
 ];

@@ -1,5 +1,9 @@
 # PNGTuber Chat
 
+Web Speech API TTS is available with browser voice selection and rate, pitch,
+volume, and language controls. Because the browser plays it directly without
+exposing audio bytes, lip sync is not supported when this engine is selected.
+
 ![react-pngtuber-app image](./images/react-pngtuber-app.png)
 
 A PNGTuber-style chat app built with `@aituber-onair/core`.  
@@ -7,18 +11,21 @@ Speech input uses Web Speech API, and lip-sync is driven in real time from actua
 
 ## What this app can do
 
-- Chat with LLM providers: `openai`, `openai-compatible`, `openrouter`, `gemini`, `gemini-nano`, `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`
+- Chat with LLM providers: `openai`, `openai-compatible`, `openrouter`, `gemini`, `gemini-nano`, `claude`, `zai`, `kimi`, `xai`, `deepseek`, `mistral`, `sakana` (disabled in browser UI), `plamo`
+- xAI Grok 4.5 exposes `reasoning_effort` and defaults to `low`; Grok 4.3 defaults to `none` for lower latency
 - Provider model lists are sourced from `@aituber-onair/core`, so newly synced
-  chat models such as Claude Opus 4.8, Gemini 3.5 Flash, and GPT-5.5 are available automatically
+  chat models such as Gemini 3.6 Flash, Kimi K3, Ministral 3, GLM-5V-Turbo,
+  and GPT-5.6 are available automatically
   in Settings
-- Gemini 3.5 Flash automatically uses minimal thinking for chat-style responses
+- Gemini 3 Flash-family models use minimal thinking by default for chat-style
+  responses; Gemini 3 Pro uses low
 - `gpt-5.5-pro` is intentionally omitted because OpenAI documents it as
   non-streaming, while this example uses the standard streaming chat flow
 - For `openrouter`, fetch currently working `:free` models from Settings:
   - `Fetch free models` probes candidates and appends working models to the model list
   - `Max candidates` is the maximum number of `:free` candidates to probe
     (not a target number of working models)
-- Use TTS engines: `openai`, `geminiTts`, `openaiCompatible`, `voicevox`, `voicepeak`, `aivisSpeech`, `aivisCloud`, `minimax`, `xai`, `unrealSpeech`, `elevenLabs`, `inworld`, `gradium`, `piperPlus`, `none`
+- Use TTS engines: `openai`, `geminiTts`, `openaiCompatible`, `voicevox`, `voicepeak`, `aivisSpeech`, `aivisCloud`, `minimax`, `xai`, `unrealSpeech`, `elevenLabs`, `inworld`, `gradium`, `piperPlus`, `webSpeech`, `none`
 - `geminiTts` defaults to `gemini-3.1-flash-tts-preview` and exposes 30 prebuilt voices plus style/audio-tag prompt input
 - Fetch and select speaker lists dynamically:
   - `voicevox` / `aivisSpeech`: from `/speakers`
@@ -31,14 +38,27 @@ Speech input uses Web Speech API, and lip-sync is driven in real time from actua
   - `まお` (`a59cb814-0083-4369-8542-f51a29e72af7`)
 - `piperPlus` expects browser assets under `public/piper/`
 - Real-time lip-sync + random blink animation
+- Canvas-based emotion effects for happy, surprised, sad, angry, relaxed, and
+  thinking responses, with disabled, manual preview, and linked control modes
+- Emotion effects start when the response emotion is received and do not depend
+  on TTS playback
+- Uses the same layered background auras and foreground effect designs as the
+  PSD/PuruPuru samples
+- Face and eye anchors and effect size can be adjusted in manual mode and are
+  saved for the current avatar image set
 - Set visuals directly in Settings:
   - Background image (1 file)
+  - Green screen background mode
+  - Broadcast layout with avatar-only captions
   - Avatar images (4 states: mouth/eyes open/close)
-- Visual image settings are memory-only (reset on page reload)
+- Visual display settings are saved in `localStorage`; uploaded images are
+  memory-only and reset on page reload
 - Fetch live chat comments from YouTube Live or Twitch and feed them into the
   LLM pipeline
   - YouTube uses the YouTube Data API v3 (requires a Google Cloud API key)
   - Twitch uses EventSub WebSocket with a browser-based implicit OAuth flow
+- Capture one frame from OBS Virtual Camera in **Settings → Screen Vision** and
+  send it to a vision-capable model for an avatar comment
 - Detect repetitive conversation patterns with `@aituber-onair/manneri` and
   add an internal topic-diversification instruction before the next response
 
@@ -52,6 +72,8 @@ npm run dev
 
 After launch, open **Settings** and set API keys / provider options there.  
 All settings are saved in `localStorage` (`react-pngtuber-app-settings`).
+The LLM section also lets you edit the system prompt. It is applied when the
+field loses focus and is saved with the other settings.
 
 For `openai-compatible`, set:
 - `Endpoint URL` (required, full `/v1/chat/completions` URL)
@@ -68,6 +90,21 @@ For `gemini-nano`, set:
 
 This app can forward live chat comments from YouTube Live or Twitch into the LLM.
 Configure it from **Settings → Stream**.
+
+## Screen Vision
+
+Start OBS Virtual Camera, choose it from **Settings → Screen Vision**, then press
+**画面を見る** to send the current frame to the selected vision-capable model.
+You can also choose an automatic interval such as 30 seconds, 1 minute,
+2 minutes, or 5 minutes.
+
+## Broadcast visuals
+
+Use **Settings → Visual** to switch the background to green screen and select
+the solo broadcast layout. In solo broadcast layout, the normal chat log is
+hidden and only the avatar's latest spoken text is shown as a lower caption.
+The user input field is hidden by default, but can be enabled in the same
+Visual settings section.
 
 Only one platform can be active at a time.
 
@@ -257,3 +294,12 @@ If it still fails, check whether your npm config/environment omits
 - `@aituber-onair/core` (LLM + TTS)
 - Web Speech API (speech input)
 - Web Audio API + `AnalyserNode` (lip-sync analysis)
+
+## Bundled Miko asset terms
+
+The four default PNGTuber images depict Miko, the official character of
+AITuber OnAir. They are not covered by the software's MIT License. See
+[Miko Asset Terms](./MIKO_ASSET_TERMS.md) for a link to the
+authoritative Japanese guidelines. The assets may be distributed as an integral part of a
+work or other content, but standalone redistribution and asset collections are
+prohibited.

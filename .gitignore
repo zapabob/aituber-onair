@@ -38,8 +38,22 @@ next-env.d.ts
 
 .env
 
+# python
+__pycache__/
+*.py[cod]
+.venv/
+
+# generated assets
+outputs/
+
 # Package-specific ignores (for monorepo)
 packages/*/node_modules/
 packages/*/dist/
 packages/*/build/
 packages/*/*.tsbuildinfo
+
+# Generated from packages/core/examples during create-aituber-onair tests/pack
+packages/create-aituber-onair/templates/
+
+# Local-only implementation plan
+/packages/agent/IMPLEMENTATION_PLAN.local.md
