@@ -9,6 +9,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useAudioLipsync } from './hooks/useAudioLipsync';
 import { useAituberCore } from './hooks/useAituberCore';
+import { useHermesCompanionAudio } from './hooks/useHermesCompanionAudio';
 import { useLiveCommentIntelligence } from './hooks/useLiveCommentIntelligence';
 import { useScreenVisionController } from './hooks/useScreenVisionController';
 import { useSettings } from './hooks/useSettings';
@@ -193,6 +194,10 @@ export default function App() {
     setEmotionEffectReaction(null);
   }, [emitAvatarReaction]);
 
+  const companionAudio = useHermesCompanionAudio({
+    onAudio: handleAudioPlay,
+  });
+
   const {
     messages,
     isProcessing,
@@ -371,6 +376,8 @@ export default function App() {
         onSend={handleSend}
         audioLevel={audioLevel}
         isSpeaking={isSpeaking}
+        companionAudioConnected={companionAudio.connected}
+        companionAudioError={companionAudio.error}
         avatarReaction={avatarReaction}
         emotionEffectReaction={emotionEffectReaction}
         reactionControlMode={

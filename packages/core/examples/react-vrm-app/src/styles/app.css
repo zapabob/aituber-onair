@@ -614,6 +614,29 @@ body {
   transition: opacity 0.15s;
 }
 
+.companion-audio-status {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 4;
+  max-width: min(260px, calc(100vw - 112px));
+  overflow: hidden;
+  border: 1px solid #5e516d;
+  border-radius: 999px;
+  background: rgba(20, 18, 32, 0.78);
+  color: #c4b8ce;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 7px 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.companion-audio-status.is-connected {
+  border-color: #4b9a7b;
+  color: #a9e3c6;
+}
+
 .chat-panel-broadcast .chat-settings-button {
   opacity: 0;
 }

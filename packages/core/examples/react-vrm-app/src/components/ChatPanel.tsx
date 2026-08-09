@@ -19,6 +19,8 @@ interface ChatPanelProps {
   onToggleSettings: () => void;
   audioLevel: number;
   isSpeaking: boolean;
+  companionAudioConnected: boolean;
+  companionAudioError: string;
   avatarReaction?: VrmAvatarReaction | null;
   emotionEffectReaction?: VrmEmotionEffectReaction | null;
   reactionControlMode: VrmReactionControlMode;
@@ -38,6 +40,8 @@ export function ChatPanel({
   onToggleSettings,
   audioLevel,
   isSpeaking,
+  companionAudioConnected,
+  companionAudioError,
   avatarReaction,
   emotionEffectReaction,
   reactionControlMode,
@@ -81,6 +85,17 @@ export function ChatPanel({
       >
         ⚙
       </button>
+      <div
+        className={`companion-audio-status${
+          companionAudioConnected ? ' is-connected' : ''
+        }`}
+        role="status"
+        title={companionAudioError || undefined}
+      >
+        {companionAudioConnected
+          ? 'Hermes companion audio connected'
+          : 'Hermes companion audio waiting'}
+      </div>
       <AvatarBackground
         audioLevel={audioLevel}
         isSpeaking={isSpeaking}

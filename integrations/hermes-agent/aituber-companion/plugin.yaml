@@ -1,0 +1,16 @@
+name: aituber-companion
+version: 0.1.0
+description: "Local AITuber OnAir TTS bridge for Project AIRI companion mode."
+author: "AITuber OnAir integration"
+kind: standalone
+platforms:
+  - windows
+  - linux
+  - macos
+provides_tools:
+  - aituber_companion_status
+  - aituber_companion_configure
+  - aituber_companion_start
+  - aituber_companion_stop
+provides_cli:
+  - aituber-companion
