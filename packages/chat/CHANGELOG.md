@@ -1,5 +1,12 @@
 # @aituber-onair/chat
 
+## 0.51.0
+
+### Minor Changes
+
+- Added the public backend helpers used by Core to preserve provider-compatible
+  tool-call continuation history.
+
 ## 0.50.0
 
 ### Minor Changes

@@ -49,7 +49,7 @@ test('generated templates use published dependency ranges', async () => {
     const packageJson = JSON.parse(
       await readFile(path.join(templateRoot, template, 'package.json'), 'utf8'),
     );
-    assert.equal(packageJson.dependencies['@aituber-onair/core'], '^0.26.10');
+    assert.equal(packageJson.dependencies['@aituber-onair/core'], '^0.26.11');
     assert.equal(
       packageJson.dependencies['@aituber-onair/comment-intelligence'],
       '^0.0.5',
@@ -76,7 +76,12 @@ test('npm pack includes generated templates without ignored assets', async () =>
       env: { ...process.env, npm_config_cache: npmCache },
     },
   );
-  const [packResult] = JSON.parse(output);
+  const packOutput = JSON.parse(output);
+  const packResult = Array.isArray(packOutput)
+    ? packOutput[0]
+    : packOutput.files
+      ? packOutput
+      : Object.values(packOutput)[0];
   const packedFiles = packResult.files.map((file) => file.path);
 
   assert.equal(
@@ -88,6 +93,10 @@ test('npm pack includes generated templates without ignored assets', async () =>
       'templates/inochi2d/scripts/download-inochi2d-sample-model.mjs',
     ),
     true,
+  );
+  assert.equal(
+    packedFiles.includes('templates/vrm/public/avatar/b0b_nYAn.vroid'),
+    false,
   );
   assert.equal(
     packedFiles.some((file) => file.endsWith('/.gitignore')),

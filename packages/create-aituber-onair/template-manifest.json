@@ -27,6 +27,7 @@
         "public/avatar/miko.vrm",
         "public/avatar/idle_loop.vrma"
       ],
+      "excludeTracked": ["public/avatar/b0b_nYAn.vroid"],
       "dependencyOverrides": {
         "@pixiv/three-vrm": "^1.0.9",
         "three": "^0.151.3"
