@@ -75,7 +75,11 @@ def policy_for(path: str) -> str:
 
 def require_clean_worktree(repo: Path) -> None:
     status = run_git(repo, "status", "--porcelain")
-    if status.strip():
+    ignored_generated_entries = {"?? scripts/__pycache__/"}
+    unexpected_entries = [
+        line for line in status.splitlines() if line not in ignored_generated_entries
+    ]
+    if unexpected_entries:
         raise RuntimeError(
             "target worktree is not clean; commit or stash its changes before "
             "an upstream merge"
