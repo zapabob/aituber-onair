@@ -46,7 +46,11 @@ from actual audio output volume.
   - `まお` (`a59cb814-0083-4369-8542-f51a29e72af7`)
 - `piperPlus` expects browser assets under `public/piper/`
 - Render a VRM avatar (`miko.vrm`) with optional idle VRMA animation
-- Real-time lip-sync for VRM expression (`Aa`)
+- Audio-envelope lip-sync for VRM expression (`Aa`) with fast attack and
+  gentle release, so short pauses do not make the mouth visibly snap shut
+- A lightweight performance layer above the optional VRMA: breathing, body
+  sway, voice-energy response, and camera-aware gaze without assuming a
+  particular avatar's custom bone or expression names
 - Configure emotion-to-effect mappings in **Settings → 感情表現エフェクト**
   and choose disabled, manual preview, or response-emotion-linked control
 - Display the same layered emotion effects as the PSD/PuruPuru samples, such as

@@ -17,7 +17,7 @@ interface ChatPanelProps {
   isProcessing: boolean;
   onSend: (text: string) => void;
   onToggleSettings: () => void;
-  mouthLevel: number;
+  audioLevel: number;
   isSpeaking: boolean;
   avatarReaction?: VrmAvatarReaction | null;
   emotionEffectReaction?: VrmEmotionEffectReaction | null;
@@ -36,7 +36,7 @@ export function ChatPanel({
   isProcessing,
   onSend,
   onToggleSettings,
-  mouthLevel,
+  audioLevel,
   isSpeaking,
   avatarReaction,
   emotionEffectReaction,
@@ -82,7 +82,7 @@ export function ChatPanel({
         ⚙
       </button>
       <AvatarBackground
-        mouthLevel={mouthLevel}
+        audioLevel={audioLevel}
         isSpeaking={isSpeaking}
         reaction={avatarReaction}
         emotionEffectReaction={emotionEffectReaction}

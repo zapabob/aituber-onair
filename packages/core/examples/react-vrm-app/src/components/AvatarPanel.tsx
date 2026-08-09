@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AmbientLight,
   AnimationClip,
@@ -7,7 +7,9 @@ import {
   CanvasTexture,
   Clock,
   DirectionalLight,
+  Group,
   LoopRepeat,
+  Object3D,
   PerspectiveCamera,
   Scene,
   Sprite,
@@ -57,9 +59,10 @@ import {
   drawEmotionEffectAura,
   type EmotionEffect,
 } from '../lib/emotionEffectRendering';
+import { getAvatarPerformanceFrame } from '../lib/avatarPerformance';
 
 interface AvatarBackgroundProps {
-  mouthLevel: number;
+  audioLevel: number;
   isSpeaking: boolean;
   reaction?: VrmAvatarReaction | null;
   emotionEffectReaction?: VrmEmotionEffectReaction | null;
@@ -72,7 +75,6 @@ interface AvatarBackgroundProps {
 
 const VRM_FILE_URL = `${import.meta.env.BASE_URL}avatar/miko.vrm`;
 const VRMA_FILE_URL = `${import.meta.env.BASE_URL}avatar/idle_loop.vrma`;
-const MAX_MOUTH_LEVEL = 4;
 const DEFAULT_VISIBLE_HEIGHT_RATIO = 0.39;
 const DEFAULT_VISIBLE_WIDTH_RATIO = 0.72;
 const DEFAULT_LOOK_AT_HEIGHT_RATIO = 0.8;
@@ -451,7 +453,7 @@ function createVrmEffectGeometry(
 }
 
 export function AvatarBackground({
-  mouthLevel,
+  audioLevel,
   isSpeaking,
   reaction,
   emotionEffectReaction,
@@ -472,6 +474,7 @@ export function AvatarBackground({
     lockUntil: 0,
   });
   const isSpeakingRef = useRef(isSpeaking);
+  const audioLevelRef = useRef(audioLevel);
   const targetMouthWeightRef = useRef(0);
   const mouthWeightRef = useRef(0);
   const effectAnchorRef = useRef(effectAnchor);
@@ -548,15 +551,10 @@ export function AvatarBackground({
     [anchorTarget, onEffectAnchorChange],
   );
 
-  const targetWeight = useMemo(() => {
-    if (!isSpeaking) return 0;
-    const normalized = mouthLevel / MAX_MOUTH_LEVEL;
-    return Math.min(Math.max(normalized, 0), 1);
-  }, [isSpeaking, mouthLevel]);
-
   useEffect(() => {
-    targetMouthWeightRef.current = targetWeight;
-  }, [targetWeight]);
+    audioLevelRef.current = audioLevel;
+    targetMouthWeightRef.current = isSpeaking ? audioLevel : 0;
+  }, [audioLevel, isSpeaking]);
 
   useEffect(() => {
     isSpeakingRef.current = isSpeaking;
@@ -645,6 +643,10 @@ export function AvatarBackground({
     scene.add(directionalLight);
     const backEffectScene = new Scene();
     const backEffectSprites = createVrmBackEffectSprites(backEffectScene);
+    const performanceRoot = new Group();
+    const lookAtTarget = new Object3D();
+    scene.add(performanceRoot);
+    scene.add(lookAtTarget);
 
     let renderer: WebGLRenderer;
     try {
@@ -798,9 +800,12 @@ export function AvatarBackground({
         defaultCameraPosition.copy(camera.position);
         defaultTarget.copy(controls.target);
 
-        scene.add(vrm.scene);
+        performanceRoot.add(vrm.scene);
         loadedVrm = vrm;
         vrmRef.current = vrm;
+        if (vrm.lookAt) {
+          vrm.lookAt.target = lookAtTarget;
+        }
         try {
           const expressionController = new VrmExpressionController(vrm);
           expressionControllerRef.current = expressionController;
@@ -878,6 +883,21 @@ export function AvatarBackground({
 
       const delta = clock.getDelta();
       const vrm = vrmRef.current;
+      controls.update();
+      const performance = getAvatarPerformanceFrame(
+        now / 1000,
+        audioLevelRef.current,
+        isSpeakingRef.current,
+      );
+      performanceRoot.position.y = performance.positionY;
+      performanceRoot.rotation.x = performance.rotationX;
+      performanceRoot.rotation.y = performance.rotationY;
+      performanceRoot.scale.y = performance.scaleY;
+      lookAtTarget.position.copy(camera.position);
+      lookAtTarget.position.x += performance.gazeX;
+      lookAtTarget.position.y += performance.gazeY;
+      performanceRoot.updateMatrixWorld(true);
+      lookAtTarget.updateMatrixWorld(true);
       if (vrm) {
         mixer?.update(delta);
         const expressionController = expressionControllerRef.current;
@@ -907,7 +927,6 @@ export function AvatarBackground({
         mixer?.update(delta);
       }
 
-      controls.update();
       if (effectBounds && vrm) {
         const width = Math.max(container.clientWidth, 1);
         const height = Math.max(container.clientHeight, 1);
@@ -954,9 +973,11 @@ export function AvatarBackground({
       resizeObserver.disconnect();
 
       if (loadedVrm) {
-        scene.remove(loadedVrm.scene);
+        performanceRoot.remove(loadedVrm.scene);
         VRMUtils.deepDispose(loadedVrm.scene);
       }
+      scene.remove(performanceRoot);
+      scene.remove(lookAtTarget);
       canvas.removeEventListener('dblclick', resetCamera);
       canvas.removeEventListener('pointerdown', setDraggingCursor);
       canvas.removeEventListener('pointerup', clearDraggingCursor);

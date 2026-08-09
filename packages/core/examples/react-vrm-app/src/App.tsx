@@ -45,7 +45,7 @@ interface SettingsDialogDragState {
 }
 
 export default function App() {
-  const { play, stop, mouthLevel, isSpeaking } = useAudioLipsync();
+  const { play, stop, audioLevel, isSpeaking } = useAudioLipsync();
   const settingsHook = useSettings();
   const updateTwitchAccessToken = settingsHook.updateTwitchAccessToken;
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -369,7 +369,7 @@ export default function App() {
         partialResponse={partialResponse}
         isProcessing={isProcessing}
         onSend={handleSend}
-        mouthLevel={mouthLevel}
+        audioLevel={audioLevel}
         isSpeaking={isSpeaking}
         avatarReaction={avatarReaction}
         emotionEffectReaction={emotionEffectReaction}

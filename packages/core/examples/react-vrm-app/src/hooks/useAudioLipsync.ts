@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { clamp01, smoothAudioEnvelope } from '../lib/audioEnvelope';
 
 /** Number of mouth animation levels (0-4) */
 const MOUTH_LEVELS = 5;
-/** Smoothing factor (higher means smoother) */
-const SMOOTH_FACTOR = 0.5;
 /** RMS normalization ceiling (this value maps to 1.0) */
 const RMS_CEILING = 0.12;
 
@@ -14,13 +13,13 @@ interface PlayAudioOptions {
 export function useAudioLipsync() {
   const [mouthLevel, setMouthLevel] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [smoothedValue, setSmoothedValue] = useState(0);
+  const [audioLevel, setAudioLevel] = useState(0);
 
   const ctxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const rafRef = useRef<number>(0);
-  const smoothedRef = useRef(0);
+  const audioLevelRef = useRef(0);
   const playbackGenerationRef = useRef(0);
 
   const getAudioContext = useCallback(() => {
@@ -47,9 +46,9 @@ export function useAudioLipsync() {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
     }
-    smoothedRef.current = 0;
+    audioLevelRef.current = 0;
     setMouthLevel(0);
-    setSmoothedValue(0);
+    setAudioLevel(0);
     setIsSpeaking(false);
   }, []);
 
@@ -88,6 +87,7 @@ export function useAudioLipsync() {
 
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.72;
 
       source.connect(gain);
       gain.connect(analyser);
@@ -99,6 +99,7 @@ export function useAudioLipsync() {
 
       // Analysis loop
       const dataArray = new Float32Array(analyser.fftSize);
+      let previousTickAt = window.performance.now();
 
       const tick = () => {
         if (generation !== playbackGenerationRef.current) return;
@@ -112,21 +113,24 @@ export function useAudioLipsync() {
         }
         const rms = Math.sqrt(sumSq / dataArray.length);
 
-        // Smooth value over time
-        smoothedRef.current =
-          smoothedRef.current * SMOOTH_FACTOR + rms * (1 - SMOOTH_FACTOR);
-
-        // Normalize (0-1)
-        const normalized = Math.min(smoothedRef.current / RMS_CEILING, 1);
+        const now = window.performance.now();
+        const normalized = clamp01(rms / RMS_CEILING);
+        const nextAudioLevel = smoothAudioEnvelope(
+          audioLevelRef.current,
+          normalized,
+          (now - previousTickAt) / 1000,
+        );
+        previousTickAt = now;
+        audioLevelRef.current = nextAudioLevel;
 
         // Mouth animation level (0-4)
         const level = Math.min(
-          Math.round(normalized * (MOUTH_LEVELS - 1)),
+          Math.round(nextAudioLevel * (MOUTH_LEVELS - 1)),
           MOUTH_LEVELS - 1,
         );
 
         setMouthLevel(level);
-        setSmoothedValue(smoothedRef.current);
+        setAudioLevel(nextAudioLevel);
 
         rafRef.current = requestAnimationFrame(tick);
       };
@@ -145,9 +149,9 @@ export function useAudioLipsync() {
             rafRef.current = 0;
           }
           analyserRef.current = null;
-          smoothedRef.current = 0;
+          audioLevelRef.current = 0;
           setMouthLevel(0);
-          setSmoothedValue(0);
+          setAudioLevel(0);
           setIsSpeaking(false);
           sourceRef.current = null;
           resolve();
@@ -171,7 +175,7 @@ export function useAudioLipsync() {
   return {
     mouthLevel,
     isSpeaking,
-    smoothedValue,
+    audioLevel,
     play,
     stop: stopCurrent,
   };
