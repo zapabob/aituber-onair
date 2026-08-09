@@ -18,19 +18,26 @@ jobs:
       with:
         fetch-depth: 0
 
-    # 2) Detect the most recent *stable* tag (skip 'next' and pre-releases like -rc)
-    - name: Determine last stable tag
-      id: tag
+    # 2) Select a release-notes range. New repositories may have no stable tag yet.
+    - name: Determine release-notes range
+      id: range
       run: |
-        last_tag=$(git describe --tags --abbrev=0 \
-                   $(git rev-list --tags --no-walk --exclude='next' --exclude='*-rc*' --max-count=1))
-        echo "last_tag=$last_tag" >>"$GITHUB_OUTPUT"
+        stable_tag=$(git describe --tags --abbrev=0 --exclude='next' \
+          --exclude='*-rc*' 2>/dev/null || true)
+        if [ -n "$stable_tag" ]; then
+          range="$stable_tag..HEAD"
+        elif git rev-parse --verify --quiet refs/tags/next >/dev/null; then
+          range="next..HEAD"
+        else
+          range="HEAD"
+        fi
+        echo "range=$range" >>"$GITHUB_OUTPUT"
 
-    # 3) Generate release notes between the last tag and HEAD
+    # 3) Generate release notes from the selected range
     - name: Generate release notes
       id: notes
       run: |
-        git log "${{ steps.tag.outputs.last_tag }}"..HEAD \
+        git log "${{ steps.range.outputs.range }}" \
                 --pretty=format:'* %s (%h)' --reverse > RELEASE_NOTES.md
         echo "notes_path=RELEASE_NOTES.md" >>"$GITHUB_OUTPUT"
 
