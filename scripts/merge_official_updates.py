@@ -139,6 +139,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", default=OFFICIAL_URL)
     parser.add_argument("--fetch", action="store_true", help="refresh official main first")
     parser.add_argument("--apply", action="store_true", help="start a no-commit, no-ff merge")
+    parser.add_argument(
+        "--allow-policy-overlaps",
+        action="store_true",
+        help="allow --apply only when every overlap has an explicit policy",
+    )
     parser.add_argument("--report", type=Path, help="write the JSON report to this path")
     return parser.parse_args()
 
@@ -159,8 +164,19 @@ def main() -> int:
 
     if not args.apply:
         return 0
-    if report["overlaps"]:
-        raise RuntimeError("refusing to merge while policy-controlled overlaps remain")
+    overlaps = report["overlaps"]
+    if overlaps and not args.allow_policy_overlaps:
+        raise RuntimeError(
+            "refusing to merge while policy-controlled overlaps remain; "
+            "rerun with --allow-policy-overlaps after reviewing the report"
+        )
+    manual_overlaps = [
+        overlap
+        for overlap in overlaps
+        if overlap["policy"] == "manual_reconciliation_required"
+    ]
+    if manual_overlaps:
+        raise RuntimeError("refusing to merge with unresolved manual-overlap policies")
     run_git(repo, "merge", "--no-commit", "--no-ff", args.official)
     print("Merge applied without a commit; run validation before committing.")
     return 0
